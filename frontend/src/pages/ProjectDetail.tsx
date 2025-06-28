@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Upload, Calendar, DollarSign, Users } from 'lucide-react'
 import api from '../services/api'
@@ -37,6 +37,7 @@ interface Task {
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
 
   const { data: project, isLoading } = useQuery<Project>({
     queryKey: ['project', id],
@@ -88,7 +89,7 @@ const ProjectDetail = () => {
           </div>
         </div>
       </div>
-      {task.children.map((child) => renderTask(child, depth + 1))}
+      {task.children?.map((child) => renderTask(child, depth + 1))}
     </div>
   )
 
@@ -109,7 +110,7 @@ const ProjectDetail = () => {
                 <Upload className="w-4 h-4 mr-2" />
                 Import P6
               </button>
-              <button className="btn btn-primary">
+              <button className="btn btn-primary" onClick={() => navigate(`/projects/${id}/tasks/new`)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Task
               </button>
@@ -170,7 +171,7 @@ const ProjectDetail = () => {
           {project.tasks.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-sm text-gray-500">No tasks defined yet.</p>
-              <button className="mt-4 btn btn-primary">
+              <button className="mt-4 btn btn-primary" onClick={() => navigate(`/projects/${id}/tasks/new`)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Task
               </button>

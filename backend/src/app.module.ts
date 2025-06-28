@@ -11,6 +11,7 @@ import { PortfolioModule } from './modules/portfolio/portfolio.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env.dev', '.env'],
     }),
     AuthModule,
     ProjectsModule,

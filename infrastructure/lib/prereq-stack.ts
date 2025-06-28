@@ -467,6 +467,18 @@ export class PrereqStack extends cdk.Stack {
       description: `JWT Secret ARN (${env})`,
     });
 
+    new ssm.StringParameter(this, 'CognitoUserPoolIdParam', {
+      parameterName: `/prereq/${env}/cognito/user-pool-id`,
+      stringValue: userPool.userPoolId,
+      description: `Cognito User Pool ID (${env})`,
+    });
+
+    new ssm.StringParameter(this, 'CognitoClientIdParam', {
+      parameterName: `/prereq/${env}/cognito/client-id`,
+      stringValue: userPoolClient.userPoolClientId,
+      description: `Cognito User Pool Client ID (${env})`,
+    });
+
     // Environment-specific outputs
     new cdk.CfnOutput(this, 'Environment', {
       value: env,

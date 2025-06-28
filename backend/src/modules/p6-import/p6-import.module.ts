@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { P6ImportService } from './p6-import.service';
 import { P6ImportController } from './p6-import.controller';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuthService } from '../auth/auth.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  providers: [P6ImportService, PrismaService, AuthService],
+  imports: [AuthModule],
+  providers: [P6ImportService, PrismaService],
   controllers: [P6ImportController],
   exports: [P6ImportService],
 })

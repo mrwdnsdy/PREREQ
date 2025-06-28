@@ -1,0 +1,14 @@
+{
+  "PREREQ": {
+    "UserPoolClientId": "403drn65sj4bf9tallvrinh7j0",
+    "UserPoolId": "us-east-2_FUtnjJ1OK",
+    "ApiUrl": "https://wrdj0rdkp3.execute-api.us-east-2.amazonaws.com/dev/",
+    "DatabaseConfiguration": "Public database (direct access)",
+    "WAFProtection": "Disabled",
+    "Environment": "dev",
+    "ThrottlingConfiguration": "Unlimited",
+    "PrereqAPIEndpoint5F9D9F82": "https://wrdj0rdkp3.execute-api.us-east-2.amazonaws.com/dev/",
+    "FrontendUrl": "https://dxrl5hkoal5oi.cloudfront.net",
+    "DatabaseEndpoint": "prereq-prereqdatabase4f1d7173-zkkxkdxj9t9r.crieasgyawhc.us-east-2.rds.amazonaws.com"
+  }
+}

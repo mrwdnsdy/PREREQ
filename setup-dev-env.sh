@@ -130,6 +130,13 @@ else
     echo -e "${GREEN}✅ Frontend dependencies installed${NC}"
 fi
 
+# Install additional required packages
+echo -e "${BLUE}📋 Step 8: Installing additional required packages...${NC}"
+cd frontend
+npm install @tanstack/react-query axios lucide-react react-router-dom > /dev/null 2>&1
+echo -e "${GREEN}✅ Additional packages installed${NC}"
+cd ..
+
 echo -e "${GREEN}🎉 Development environment setup complete!${NC}"
 echo ""
 echo -e "${BLUE}📖 Next steps:${NC}"

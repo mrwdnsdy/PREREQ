@@ -36,21 +36,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const navigate = useNavigate()
 
   useEffect(() => {
+    console.log('AuthProvider: Initializing...')
     const token = localStorage.getItem('authToken')
     if (token) {
+      console.log('AuthProvider: Found existing token, fetching profile...')
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`
       fetchUserProfile()
     } else {
+      console.log('AuthProvider: No token found')
       setLoading(false)
     }
   }, [])
 
   const fetchUserProfile = async () => {
     try {
+      console.log('AuthProvider: Fetching user profile...')
       const response = await api.get('/auth/profile')
+      console.log('AuthProvider: Profile response:', response.data)
       setUser(response.data)
     } catch (error) {
-      console.error('Failed to fetch user profile:', error)
+      console.error('AuthProvider: Failed to fetch user profile:', error)
       localStorage.removeItem('authToken')
       delete api.defaults.headers.common['Authorization']
     } finally {
@@ -59,13 +64,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const login = async (token: string) => {
+    console.log('AuthProvider: Login called with token:', token ? 'present' : 'missing')
     localStorage.setItem('authToken', token)
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`
     await fetchUserProfile()
+    console.log('AuthProvider: Login complete, navigating to dashboard...')
     navigate('/')
   }
 
   const logout = () => {
+    console.log('AuthProvider: Logout called')
     localStorage.removeItem('authToken')
     delete api.defaults.headers.common['Authorization']
     setUser(null)
@@ -79,6 +87,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isAuthenticated: !!user,
   }
+
+  console.log('AuthProvider: Current state:', { 
+    user: user ? 'present' : 'null', 
+    loading, 
+    isAuthenticated: !!user 
+  })
 
   return (
     <AuthContext.Provider value={value}>

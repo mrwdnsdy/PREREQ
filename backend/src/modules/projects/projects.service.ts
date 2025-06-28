@@ -96,11 +96,12 @@ export class ProjectsService {
                 successor: true,
               },
             },
+            children: true,
           },
-          orderBy: {
-            level: 'asc',
-            wbsCode: 'asc',
-          },
+          orderBy: [
+            { level: 'asc' },
+            { wbsCode: 'asc' },
+          ],
         },
       },
     });

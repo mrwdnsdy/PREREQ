@@ -14,13 +14,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    try {
-      // For Cognito tokens, we need to validate them differently
-      // This is a simplified version - in production, you'd verify the JWT signature
-      const user = await this.authService.validateCognitoToken(payload.sub);
-      return user;
-    } catch (error) {
+    const user = await this.authService.getUserById(payload.sub);
+    if (!user) {
       throw new UnauthorizedException('Invalid token');
     }
+    return user;
   }
 } 

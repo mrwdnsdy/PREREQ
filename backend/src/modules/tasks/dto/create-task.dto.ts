@@ -1,14 +1,14 @@
-import { IsString, IsDateString, IsOptional, IsNumber, IsBoolean, Min, Max, IsUUID } from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsNumber, IsBoolean, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateTaskDto {
   @ApiProperty({ description: 'Project ID' })
-  @IsUUID()
+  @IsString()
   projectId: string;
 
   @ApiPropertyOptional({ description: 'Parent task ID for WBS hierarchy' })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   parentId?: string;
 
   @ApiProperty({ description: 'WBS code (e.g., 1.1, 1.2.1)' })

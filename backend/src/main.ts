@@ -7,6 +7,11 @@ import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-sec
 import { INestApplication } from '@nestjs/common';
 import serverlessExpress from '@codegenie/serverless-express';
 
+// Load environment variables for local development
+if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  require('dotenv').config({ path: '.env.dev' });
+}
+
 // Cache the serverless express instance across Lambda invocations
 let serverlessExpressInstance: any;
 
@@ -32,7 +37,10 @@ async function setupLambda(event: APIGatewayProxyEvent, context: Context) {
   // Create NestJS application
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
-  app.enableCors();
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    credentials: true,
+  });
 
   // Gate Swagger UI in production for Lambda
   if (process.env.NODE_ENV === 'prod') {
@@ -95,7 +103,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   app.useGlobalPipes(new ValidationPipe());
-  app.enableCors();
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    credentials: true,
+  });
 
   // Swagger API documentation
   const config = new DocumentBuilder()

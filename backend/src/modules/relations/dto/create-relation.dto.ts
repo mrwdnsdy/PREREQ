@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum, IsUUID } from 'class-validator';
+import { IsString, IsNumber, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum RelationType {
@@ -10,7 +10,7 @@ export enum RelationType {
 
 export class CreateRelationDto {
   @ApiProperty({ description: 'Successor task ID' })
-  @IsUUID()
+  @IsString()
   successorId: string;
 
   @ApiProperty({ 
