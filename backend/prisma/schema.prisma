@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  fullName  String?
+  cognitoId String   @unique @map("cognito_id")
+  members   ProjectMember[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Project {
+  id         String   @id @default(cuid())
+  name       String
+  client     String?
+  startDate  DateTime @map("start_date")
+  endDate    DateTime @map("end_date")
+  budget     Float?
+  tasks      Task[]
+  members    ProjectMember[]
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("projects")
+}
+
+model Task {
+  id           String   @id @default(cuid())
+  projectId    String   @index @map("project_id")
+  parentId     String?  @index @map("parent_id")
+  level        Int      @default(1)
+  wbsCode      String   @map("wbs_code")
+  title        String
+  description  String?
+  startDate    DateTime @map("start_date")
+  endDate      DateTime @map("end_date")
+  isMilestone  Boolean  @default(false) @map("is_milestone")
+  costLabor    Float    @default(0) @map("cost_labor")
+  costMaterial Float    @default(0) @map("cost_material")
+  costOther    Float    @default(0) @map("cost_other")
+  resourceRole String?  @map("resource_role")
+  resourceQty  Float?   @map("resource_qty")
+  resourceUnit String?  @map("resource_unit")
+  predecessors TaskRelation[] @relation("predecessors")
+  successors   TaskRelation[] @relation("successors")
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent       Task?    @relation("TaskHierarchy", fields: [parentId], references: [id])
+  children     Task[]   @relation("TaskHierarchy")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("tasks")
+  @@index([projectId, parentId])
+  @@index([projectId, level])
+}
+
+model TaskRelation {
+  id           String  @id @default(cuid())
+  predecessor  Task    @relation("successors", fields: [predecessorId], references: [id], onDelete: Cascade)
+  predecessorId String @map("predecessor_id")
+  successor     Task   @relation("predecessors", fields: [successorId], references: [id], onDelete: Cascade)
+  successorId   String @map("successor_id")
+  type          RelationType
+  lag           Float   // positive = delay, negative = lead (in minutes)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([predecessorId, successorId])
+  @@map("task_relations")
+}
+
+enum RelationType {
+  FS  // Finish to Start
+  SS  // Start to Start
+  FF  // Finish to Finish
+  SF  // Start to Finish
+}
+
+model ProjectMember {
+  id        String  @id @default(cuid())
+  userId    String  @index @map("user_id")
+  projectId String  @index @map("project_id")
+  role      MemberRole
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, projectId])
+  @@map("project_members")
+}
+
+enum MemberRole {
+  ADMIN
+  PM
+  VIEWER
+} 
