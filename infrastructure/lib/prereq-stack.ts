@@ -2,7 +2,6 @@ import * as cdk from 'aws-cdk-lib';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -245,16 +244,11 @@ export class PrereqStack extends cdk.Stack {
 
     const currentThrottle = throttleConfig[env as keyof typeof throttleConfig];
 
-    // Lambda Function using NodejsFunction with tree-shaking
-    const apiLambda = new NodejsFunction(this, 'PrereqAPILambda', {
-      entry: '../backend/src/main.ts',
-      handler: 'handler',
+    // Lambda Function using regular Function (no Docker required)
+    const apiLambda = new lambda.Function(this, 'PrereqAPILambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
-      bundling: {
-        externalModules: ['@nestjs/core', '@nestjs/common', 'pg'],
-        minify: true,
-        sourceMap: true,
-      },
+      handler: 'main.handler',
+      code: lambda.Code.fromAsset('../backend/dist'),
       vpc,
       securityGroups: [lambdaSg],
       environment: {
