@@ -105,7 +105,32 @@ export class PrereqStack extends cdk.Stack {
     let dbEndpoint: string;
     
     if (env !== 'dev') {
-      // Stage/Prod: Create RDS Proxy
+      // Create environment-specific security groups for proxy
+      let proxySecurityGroups: ec2.SecurityGroup[];
+      
+      if (isStage) {
+        // Stage: Create public security group for proxy
+        const proxyPublicSg = new ec2.SecurityGroup(this, 'PrereqProxyPublicSG', {
+          vpc,
+          description: 'Public access security group for RDS Proxy (stage only)',
+          allowAllOutbound: true,
+        });
+        
+        // Allow public access to proxy in stage (for founders/demo clients)
+        proxyPublicSg.addIngressRule(
+          ec2.Peer.anyIpv4(),
+          ec2.Port.tcp(5432),
+          'Allow public access to RDS Proxy (stage only)'
+        );
+
+        // Stage: Use both DB security group and public security group
+        proxySecurityGroups = [dbSecurityGroup, proxyPublicSg];
+      } else {
+        // Prod: Use only the private DB security group
+        proxySecurityGroups = [dbSecurityGroup];
+      }
+
+      // Stage/Prod: Create RDS Proxy with appropriate security groups
       dbProxy = new rds.DatabaseProxy(this, 'PrereqDatabaseProxy', {
         proxyTarget: rds.ProxyTarget.fromInstance(database),
         secrets: [database.secret!],
@@ -113,29 +138,9 @@ export class PrereqStack extends cdk.Stack {
         vpcSubnets: {
           subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
         },
-        securityGroups: [dbSecurityGroup],
+        securityGroups: proxySecurityGroups,
         requireTLS: true,
       });
-
-      // Stage: Make proxy publicly accessible, Prod: keep private
-      if (isStage) {
-        // Create separate proxy security group for stage public access
-        const proxyPublicSg = new ec2.SecurityGroup(this, 'PrereqProxyPublicSG', {
-          vpc,
-          description: 'Public access security group for RDS Proxy (stage only)',
-          allowAllOutbound: true,
-        });
-        
-        // Allow access from anywhere to proxy in stage (for founders/demo clients)
-        proxyPublicSg.addIngressRule(
-          ec2.Peer.anyIpv4(),
-          ec2.Port.tcp(5432),
-          'Allow public access to RDS Proxy (stage only)'
-        );
-
-        // Note: In real implementation, you'd need to create a separate proxy or configure ALB
-        // This is a simplified approach - in practice, you might use an Application Load Balancer
-      }
       
       dbEndpoint = dbProxy.endpoint;
     } else {
