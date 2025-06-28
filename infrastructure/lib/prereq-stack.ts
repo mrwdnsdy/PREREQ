@@ -21,8 +21,11 @@ export class PrereqStack extends cdk.Stack {
 
     // Determine if this is production environment
     const isProd = this.node.tryGetContext('env') === 'prod';
+    
+    // Developer IP for dev environment database access (configure this!)
+    const devIP = this.node.tryGetContext('devIP') || '0.0.0.0/0'; // Replace with your IP/32
 
-    // VPC with cost-optimized NAT configuration
+    // VPC with environment-aware NAT configuration
     const vpc = new ec2.Vpc(this, 'PrereqVPC', {
       maxAzs: 2,
       natGateways: isProd ? 1 : 0,
@@ -47,21 +50,30 @@ export class PrereqStack extends cdk.Stack {
       allowAllOutbound: true,
     });
 
-    // Database Security Group with outbound enabled
+    // Database Security Group with environment-aware access
     const dbSecurityGroup = new ec2.SecurityGroup(this, 'PrereqDBSecurityGroup', {
       vpc,
       description: 'Security group for PREREQ RDS instance',
-      allowAllOutbound: true, // Allow database to talk back
+      allowAllOutbound: true,
     });
 
-    // Allow PostgreSQL access only from Lambda SG
+    // Allow PostgreSQL access from Lambda (all environments)
     dbSecurityGroup.addIngressRule(
       lambdaSg,
       ec2.Port.tcp(5432),
       'Allow PostgreSQL access from Lambda'
     );
 
-    // RDS PostgreSQL Instance in private isolated subnets
+    // Dev only: Allow direct access from developer IP
+    if (!isProd) {
+      dbSecurityGroup.addIngressRule(
+        ec2.Peer.ipv4(devIP),
+        ec2.Port.tcp(5432),
+        'Allow PostgreSQL access from developer IP (dev only)'
+      );
+    }
+
+    // Environment-aware RDS configuration
     const database = new rds.DatabaseInstance(this, 'PrereqDatabase', {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_17_5,
@@ -69,19 +81,70 @@ export class PrereqStack extends cdk.Stack {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc,
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        // Dev: public subnets for direct access, Prod: private isolated
+        subnetType: isProd ? ec2.SubnetType.PRIVATE_ISOLATED : ec2.SubnetType.PUBLIC,
       },
       securityGroups: [dbSecurityGroup],
       databaseName: 'prereq',
       credentials: rds.Credentials.fromGeneratedSecret('prereq_admin'),
-      publiclyAccessible: false,
+      // Dev: publicly accessible for local tools, Prod: private
+      publiclyAccessible: !isProd,
       backupRetention: cdk.Duration.days(7),
+      // Prod: enable deletion protection, Dev: allow easy cleanup
       deletionProtection: isProd,
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
 
     // Add automatic secret rotation for database
     database.addRotationSingleUser();
+
+    // RDS Proxy for connection pooling and enhanced security
+    const dbProxy = new rds.DatabaseProxy(this, 'PrereqDatabaseProxy', {
+      proxyTarget: rds.ProxyTarget.fromInstance(database),
+      secrets: [database.secret!],
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+      },
+      securityGroups: [dbSecurityGroup],
+      requireTLS: true,
+    });
+
+    // Optional: SSM Bastion for prod debugging (t3.nano)
+    let bastionInstance: ec2.Instance | undefined;
+    if (isProd) {
+      // Bastion security group
+      const bastionSg = new ec2.SecurityGroup(this, 'PrereqBastionSG', {
+        vpc,
+        description: 'Security group for PREREQ SSM bastion',
+        allowAllOutbound: true,
+      });
+
+      // Bastion instance for port forwarding in prod
+      bastionInstance = new ec2.Instance(this, 'PrereqBastion', {
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.NANO),
+        machineImage: ec2.MachineImage.latestAmazonLinux2023(),
+        vpc,
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        },
+        securityGroup: bastionSg,
+        role: new iam.Role(this, 'PrereqBastionRole', {
+          assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+          managedPolicies: [
+            iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+          ],
+        }),
+        userData: ec2.UserData.forLinux(),
+      });
+
+      // Allow bastion to access database
+      dbSecurityGroup.addIngressRule(
+        bastionSg,
+        ec2.Port.tcp(5432),
+        'Allow PostgreSQL access from bastion (prod only)'
+      );
+    }
 
     // JWT Secret in Secrets Manager
     const jwtSecret = new secretsmanager.Secret(this, 'JwtSecret', {
@@ -92,11 +155,6 @@ export class PrereqStack extends cdk.Stack {
       },
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
-
-    // Add 30-day rotation for JWT secret (requires rotationLambda or hostedRotation)
-    // jwtSecret.addRotationSchedule('RotateMonthly', {
-    //   automaticallyAfter: cdk.Duration.days(30),
-    // });
 
     // Cognito User Pool
     const userPool = new cognito.UserPool(this, 'PrereqUserPool', {
@@ -157,7 +215,9 @@ export class PrereqStack extends cdk.Stack {
       vpc,
       securityGroups: [lambdaSg],
       environment: {
+        // Use RDS Proxy endpoint for better connection management
         DB_SECRET_ARN: database.secret!.secretArn,
+        DB_PROXY_ENDPOINT: dbProxy.endpoint,
         JWT_SECRET_ARN: jwtSecret.secretArn,
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
@@ -172,8 +232,8 @@ export class PrereqStack extends cdk.Stack {
       retention: logs.RetentionDays.ONE_MONTH,
     });
 
-    // Grant Lambda access to RDS and Secrets Manager
-    database.grantConnect(apiLambda);
+    // Grant Lambda access to RDS Proxy and Secrets Manager
+    dbProxy.grantConnect(apiLambda, 'prereq_admin');
     database.secret?.grantRead(apiLambda);
     jwtSecret.grantRead(apiLambda);
 
@@ -320,7 +380,13 @@ export class PrereqStack extends cdk.Stack {
     new ssm.StringParameter(this, 'DatabaseEndpointParam', {
       parameterName: '/prereq/database/endpoint',
       stringValue: database.instanceEndpoint.hostname,
-      description: 'RDS Database Endpoint (private)',
+      description: 'RDS Database Endpoint',
+    });
+
+    new ssm.StringParameter(this, 'DatabaseProxyEndpointParam', {
+      parameterName: '/prereq/database/proxy-endpoint',
+      stringValue: dbProxy.endpoint,
+      description: 'RDS Proxy Endpoint',
     });
 
     new ssm.StringParameter(this, 'DatabaseSecretArnParam', {
@@ -335,7 +401,30 @@ export class PrereqStack extends cdk.Stack {
       description: 'JWT Secret ARN',
     });
 
-    // Keep only public-facing outputs
+    // Environment-specific outputs
+    if (bastionInstance) {
+      new cdk.CfnOutput(this, 'BastionInstanceId', {
+        value: bastionInstance.instanceId,
+        description: 'Bastion instance ID for SSM port forwarding (prod only)',
+      });
+    }
+
+    new cdk.CfnOutput(this, 'DatabaseEnvironment', {
+      value: isProd ? 'production (private)' : 'development (public)',
+      description: 'Database environment configuration',
+    });
+
+    new cdk.CfnOutput(this, 'DatabaseEndpoint', {
+      value: database.instanceEndpoint.hostname,
+      description: 'Direct database endpoint',
+    });
+
+    new cdk.CfnOutput(this, 'DatabaseProxyEndpoint', {
+      value: dbProxy.endpoint,
+      description: 'RDS Proxy endpoint (recommended for applications)',
+    });
+
+    // Keep existing public-facing outputs
     new cdk.CfnOutput(this, 'UserPoolId', {
       value: userPool.userPoolId,
       description: 'Cognito User Pool ID',
