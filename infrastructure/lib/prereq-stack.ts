@@ -7,6 +7,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
@@ -14,28 +15,51 @@ export class PrereqStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // VPC for RDS
+    // VPC with proper subnet configuration
     const vpc = new ec2.Vpc(this, 'PrereqVPC', {
       maxAzs: 2,
       natGateways: 1,
+      subnetConfiguration: [
+        {
+          name: 'private-isolated',
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+          cidrMask: 24,
+        },
+        {
+          name: 'private-with-egress',
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+          cidrMask: 24,
+        },
+        {
+          name: 'public',
+          subnetType: ec2.SubnetType.PUBLIC,
+          cidrMask: 24,
+        },
+      ],
     });
 
-    // Security Group for RDS
-    const dbSecurityGroup = new ec2.SecurityGroup(this, 'PrereqDBSecurityGroup', {
+    // Lambda Security Group
+    const lambdaSecurityGroup = new ec2.SecurityGroup(this, 'PrereqLambdaSG', {
       vpc,
-      description: 'Security group for PREREQ RDS instance',
+      description: 'Security group for PREREQ Lambda functions',
       allowAllOutbound: true,
     });
 
-    // Allow PostgreSQL access from anywhere (for development)
-    // In production, restrict to specific IPs or VPC
+    // Database Security Group
+    const dbSecurityGroup = new ec2.SecurityGroup(this, 'PrereqDBSecurityGroup', {
+      vpc,
+      description: 'Security group for PREREQ RDS instance',
+      allowAllOutbound: false,
+    });
+
+    // Allow PostgreSQL access only from Lambda SG
     dbSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
+      lambdaSecurityGroup,
       ec2.Port.tcp(5432),
-      'Allow PostgreSQL access'
+      'Allow PostgreSQL access from Lambda'
     );
 
-    // RDS PostgreSQL Instance
+    // RDS PostgreSQL Instance in private isolated subnets
     const database = new rds.DatabaseInstance(this, 'PrereqDatabase', {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_17_5,
@@ -43,14 +67,24 @@ export class PrereqStack extends cdk.Stack {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc,
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PUBLIC,
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
       securityGroups: [dbSecurityGroup],
       databaseName: 'prereq',
       credentials: rds.Credentials.fromGeneratedSecret('prereq_admin'),
+      publiclyAccessible: false,
       backupRetention: cdk.Duration.days(7),
       deletionProtection: false, // Set to true for production
       removalPolicy: cdk.RemovalPolicy.DESTROY, // Set to RETAIN for production
+    });
+
+    // JWT Secret in Secrets Manager
+    const jwtSecret = new secretsmanager.Secret(this, 'JwtSecret', {
+      description: 'JWT signing secret for PREREQ API',
+      generateSecretString: {
+        excludePunctuation: true,
+        passwordLength: 32,
+      },
     });
 
     // Cognito User Pool
@@ -99,15 +133,32 @@ export class PrereqStack extends cdk.Stack {
       },
     });
 
-    // Lambda Function for API
+    // Lambda Function for API using traditional Function with bundled code
     const apiLambda = new lambda.Function(this, 'PrereqAPILambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'dist/main.handler',
-      code: lambda.Code.fromAsset('../backend'),
+      handler: 'main.handler',
+      code: lambda.Code.fromAsset('../backend', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_18_X.bundlingImage,
+          command: [
+            'bash', '-c', [
+              'npm ci --only=production',
+              'npm run build',
+              'cp -r dist/* /asset-output/',
+              'cp -r node_modules /asset-output/',
+              'cp package*.json /asset-output/',
+            ].join(' && ')
+          ],
+        },
+      }),
       vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [lambdaSecurityGroup],
       environment: {
         DB_SECRET_ARN: database.secret?.secretArn || '',
-        JWT_SECRET: 'your-jwt-secret-change-in-production',
+        JWT_SECRET_ARN: jwtSecret.secretArn,
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
       },
@@ -118,6 +169,7 @@ export class PrereqStack extends cdk.Stack {
     // Grant Lambda access to RDS and Secrets Manager
     database.grantConnect(apiLambda);
     database.secret?.grantRead(apiLambda);
+    jwtSecret.grantRead(apiLambda);
 
     // API Gateway
     const api = new apigateway.RestApi(this, 'PrereqAPI', {
@@ -139,27 +191,32 @@ export class PrereqStack extends cdk.Stack {
       anyMethod: true,
     });
 
-    // S3 Bucket for Frontend
+    // Private S3 Bucket for Frontend
     const frontendBucket = new s3.Bucket(this, 'PrereqFrontendBucket', {
       bucketName: `prereq-frontend-${this.account}-${this.region}`,
-      websiteIndexDocument: 'index.html',
-      websiteErrorDocument: 'index.html',
-      publicReadAccess: true,
-      blockPublicAccess: new s3.BlockPublicAccess({
-        blockPublicAcls: false,
-        ignorePublicAcls: false,
-        blockPublicPolicy: false,
-        restrictPublicBuckets: false,
-      }),
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
 
-    // CloudFront Distribution
+    // CloudFront Origin Access Identity
+    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, 'PrereqOAI', {
+      comment: 'OAI for PREREQ frontend bucket',
+    });
+
+    // Grant CloudFront read access to the bucket
+    frontendBucket.grantRead(originAccessIdentity);
+
+    // CloudFront Distribution with OAI
     const distribution = new cloudfront.Distribution(this, 'PrereqDistribution', {
       defaultBehavior: {
-        origin: new origins.S3Origin(frontendBucket),
+        origin: new origins.S3Origin(frontendBucket, {
+          originAccessIdentity,
+        }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+        cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
       },
       defaultRootObject: 'index.html',
       errorResponses: [
@@ -167,6 +224,13 @@ export class PrereqStack extends cdk.Stack {
           httpStatus: 404,
           responseHttpStatus: 200,
           responsePagePath: '/index.html',
+          ttl: cdk.Duration.minutes(5),
+        },
+        {
+          httpStatus: 403,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.minutes(5),
         },
       ],
     });
@@ -174,7 +238,7 @@ export class PrereqStack extends cdk.Stack {
     // Outputs
     new cdk.CfnOutput(this, 'DatabaseEndpoint', {
       value: database.instanceEndpoint.hostname,
-      description: 'RDS Database Endpoint',
+      description: 'RDS Database Endpoint (private)',
     });
 
     new cdk.CfnOutput(this, 'DatabasePort', {
@@ -182,9 +246,14 @@ export class PrereqStack extends cdk.Stack {
       description: 'RDS Database Port',
     });
 
-    new cdk.CfnOutput(this, 'DatabaseName', {
-      value: database.instanceEndpoint.hostname,
-      description: 'RDS Database Name',
+    new cdk.CfnOutput(this, 'DatabaseSecretArn', {
+      value: database.secret?.secretArn || '',
+      description: 'RDS Database Secret ARN',
+    });
+
+    new cdk.CfnOutput(this, 'JwtSecretArn', {
+      value: jwtSecret.secretArn,
+      description: 'JWT Secret ARN',
     });
 
     new cdk.CfnOutput(this, 'UserPoolId', {
@@ -203,8 +272,13 @@ export class PrereqStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'FrontendUrl', {
-      value: distribution.distributionDomainName,
+      value: `https://${distribution.distributionDomainName}`,
       description: 'CloudFront Distribution URL',
+    });
+
+    new cdk.CfnOutput(this, 'FrontendBucketName', {
+      value: frontendBucket.bucketName,
+      description: 'S3 Frontend Bucket Name',
     });
   }
 } 

@@ -4,16 +4,56 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Handler, Context, APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { INestApplication } from '@nestjs/common';
+import serverlessExpress from '@codegenie/serverless-express';
 
-// Lambda handler for AWS deployment
+// Cache the serverless express instance across Lambda invocations
+let serverlessExpressInstance: any;
+
+// Lambda handler for AWS deployment with cold-start optimization
 export const handler: Handler = async (
   event: APIGatewayProxyEvent,
   context: Context,
 ): Promise<APIGatewayProxyResult> => {
+  // Return cached instance if available
+  if (serverlessExpressInstance) {
+    return serverlessExpressInstance(event, context);
+  }
+
+  // Setup environment and create new instance
+  return await setupLambda(event, context);
+};
+
+// Setup function for first invocation
+async function setupLambda(event: APIGatewayProxyEvent, context: Context) {
+  // Set up environment variables from AWS Secrets Manager
+  await setupEnvironment();
+
+  // Create NestJS application
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(new ValidationPipe());
+  app.enableCors();
+  await app.init();
+
+  // Get the Express instance from NestJS
+  const expressApp = app.getHttpAdapter().getInstance();
+
+  // Create and cache serverless express instance
+  serverlessExpressInstance = serverlessExpress({ app: expressApp });
+
+  // Handle the current request
+  return serverlessExpressInstance(event, context);
+}
+
+// Setup environment variables from AWS Secrets Manager
+async function setupEnvironment() {
+  const secretsClient = new SecretsManagerClient({ 
+    region: process.env.AWS_REGION || 'us-east-2' 
+  });
+
   // Set up DATABASE_URL from AWS Secrets Manager
   if (process.env.DB_SECRET_ARN && !process.env.DATABASE_URL) {
     try {
-      const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
       const command = new GetSecretValueCommand({ SecretId: process.env.DB_SECRET_ARN });
       const secret = await secretsClient.send(command);
       
@@ -23,39 +63,26 @@ export const handler: Handler = async (
       }
     } catch (error) {
       console.error('Failed to get database credentials from Secrets Manager:', error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Database configuration error' }),
-      };
+      throw new Error('Database configuration error');
     }
   }
 
-  // Create NestJS application
-  const app = await NestFactory.create(AppModule);
-  
-  app.useGlobalPipes(new ValidationPipe());
-  app.enableCors();
-  
-  await app.init();
-
-  // Handle the request
-  const nestHandler = app.getHttpAdapter().getInstance();
-  
-  return new Promise((resolve, reject) => {
-    const request = {
-      method: event.httpMethod,
-      url: event.path,
-      headers: event.headers,
-      body: event.body,
-    };
-
-    nestHandler(request, {
-      status: (code: number) => ({ json: (body: any) => resolve({ statusCode: code, body: JSON.stringify(body) }) }),
-      json: (body: any) => resolve({ statusCode: 200, body: JSON.stringify(body) }),
-      send: (body: any) => resolve({ statusCode: 200, body: typeof body === 'string' ? body : JSON.stringify(body) }),
-    });
-  });
-};
+  // Set up JWT_SECRET from AWS Secrets Manager
+  if (process.env.JWT_SECRET_ARN && !process.env.JWT_SECRET) {
+    try {
+      const command = new GetSecretValueCommand({ SecretId: process.env.JWT_SECRET_ARN });
+      const secret = await secretsClient.send(command);
+      
+      if (secret.SecretString) {
+        // JWT secret is stored as a plain string, not JSON
+        process.env.JWT_SECRET = secret.SecretString;
+      }
+    } catch (error) {
+      console.error('Failed to get JWT secret from Secrets Manager:', error);
+      throw new Error('JWT secret configuration error');
+    }
+  }
+}
 
 // Local development bootstrap
 async function bootstrap() {
