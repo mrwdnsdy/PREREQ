@@ -29,6 +29,7 @@ interface Task {
   isMilestone: boolean
   startDate: string
   endDate: string
+  parentId?: string
   children: Task[]
   predecessors: any[]
   successors: any[]
