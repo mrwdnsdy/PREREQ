@@ -166,6 +166,12 @@ export class PrereqStack extends cdk.Stack {
       memorySize: 512,
     });
 
+    // Lambda log group with symmetric retention
+    new logs.LogGroup(this, 'PrereqAPILambdaLogs', {
+      logGroupName: `/aws/lambda/${apiLambda.functionName}`,
+      retention: logs.RetentionDays.ONE_MONTH,
+    });
+
     // Grant Lambda access to RDS and Secrets Manager
     database.grantConnect(apiLambda);
     database.secret?.grantRead(apiLambda);
