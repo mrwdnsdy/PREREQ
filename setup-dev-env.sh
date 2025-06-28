@@ -103,7 +103,25 @@ else
     echo -e "${GREEN}✅ Backend dependencies installed${NC}"
 fi
 
+echo -e "${BLUE}📋 Step 6: Setting up Prisma database...${NC}"
+
+# Generate Prisma client and sync database
+cd backend
+if npx prisma generate > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ Prisma client generated${NC}"
+else
+    echo -e "${RED}❌ Failed to generate Prisma client${NC}"
+fi
+
+if npx prisma db push > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ Database schema synchronized${NC}"
+else
+    echo -e "${YELLOW}⚠️  Database schema sync failed - check connection${NC}"
+fi
+cd ..
+
 # Install frontend dependencies
+echo -e "${BLUE}📋 Step 7: Installing frontend dependencies...${NC}"
 if [ -d "frontend/node_modules" ]; then
     echo -e "${GREEN}✅ Frontend dependencies already installed${NC}"
 else
