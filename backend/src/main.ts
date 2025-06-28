@@ -33,6 +33,12 @@ async function setupLambda(event: APIGatewayProxyEvent, context: Context) {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.enableCors();
+
+  // Gate Swagger UI in production for Lambda
+  if (process.env.NODE_ENV === 'prod') {
+    app.use('/api', (req, res) => res.status(404).send());
+  }
+
   await app.init();
 
   // Get the Express instance from NestJS
@@ -100,6 +106,11 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
+
+  // Gate Swagger UI in production
+  if (process.env.NODE_ENV === 'prod') {
+    app.use('/api', (req, res) => res.status(404).send());
+  }
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

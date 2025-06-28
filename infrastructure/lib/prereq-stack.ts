@@ -2,12 +2,15 @@ import * as cdk from 'aws-cdk-lib';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
@@ -15,46 +18,44 @@ export class PrereqStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // VPC with proper subnet configuration
+    // Determine if this is production environment
+    const isProd = this.node.tryGetContext('env') === 'prod';
+
+    // VPC with cost-optimized NAT configuration
     const vpc = new ec2.Vpc(this, 'PrereqVPC', {
       maxAzs: 2,
-      natGateways: 1,
+      natGateways: isProd ? 1 : 0,
       subnetConfiguration: [
-        {
-          name: 'private-isolated',
-          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-          cidrMask: 24,
-        },
-        {
-          name: 'private-with-egress',
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-          cidrMask: 24,
-        },
-        {
-          name: 'public',
-          subnetType: ec2.SubnetType.PUBLIC,
-          cidrMask: 24,
-        },
+        { name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
+        { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
       ],
     });
 
+    // VPC Endpoints for dev environment (no NAT)
+    if (!isProd) {
+      vpc.addGatewayEndpoint('S3Endpoint', { service: ec2.GatewayVpcEndpointAwsService.S3 });
+      vpc.addInterfaceEndpoint('SecretsEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+      });
+    }
+
     // Lambda Security Group
-    const lambdaSecurityGroup = new ec2.SecurityGroup(this, 'PrereqLambdaSG', {
+    const lambdaSg = new ec2.SecurityGroup(this, 'PrereqLambdaSG', {
       vpc,
       description: 'Security group for PREREQ Lambda functions',
       allowAllOutbound: true,
     });
 
-    // Database Security Group
+    // Database Security Group with outbound enabled
     const dbSecurityGroup = new ec2.SecurityGroup(this, 'PrereqDBSecurityGroup', {
       vpc,
       description: 'Security group for PREREQ RDS instance',
-      allowAllOutbound: false,
+      allowAllOutbound: true, // Allow database to talk back
     });
 
     // Allow PostgreSQL access only from Lambda SG
     dbSecurityGroup.addIngressRule(
-      lambdaSecurityGroup,
+      lambdaSg,
       ec2.Port.tcp(5432),
       'Allow PostgreSQL access from Lambda'
     );
@@ -75,8 +76,11 @@ export class PrereqStack extends cdk.Stack {
       publiclyAccessible: false,
       backupRetention: cdk.Duration.days(7),
       deletionProtection: false, // Set to true for production
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // Set to RETAIN for production
+      removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
+
+    // Add automatic secret rotation for database
+    database.addRotationSingleUser();
 
     // JWT Secret in Secrets Manager
     const jwtSecret = new secretsmanager.Secret(this, 'JwtSecret', {
@@ -85,6 +89,11 @@ export class PrereqStack extends cdk.Stack {
         excludePunctuation: true,
         passwordLength: 32,
       },
+    });
+
+    // Add 30-day rotation for JWT secret
+    jwtSecret.addRotationSchedule('RotateMonthly', {
+      automaticallyAfter: cdk.Duration.days(30),
     });
 
     // Cognito User Pool
@@ -133,31 +142,20 @@ export class PrereqStack extends cdk.Stack {
       },
     });
 
-    // Lambda Function for API using traditional Function with bundled code
-    const apiLambda = new lambda.Function(this, 'PrereqAPILambda', {
+    // Lambda Function using NodejsFunction with tree-shaking
+    const apiLambda = new NodejsFunction(this, 'PrereqAPILambda', {
+      entry: '../backend/src/main.ts',
+      handler: 'handler',
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'main.handler',
-      code: lambda.Code.fromAsset('../backend', {
-        bundling: {
-          image: lambda.Runtime.NODEJS_18_X.bundlingImage,
-          command: [
-            'bash', '-c', [
-              'npm ci --only=production',
-              'npm run build',
-              'cp -r dist/* /asset-output/',
-              'cp -r node_modules /asset-output/',
-              'cp package*.json /asset-output/',
-            ].join(' && ')
-          ],
-        },
-      }),
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      bundling: {
+        externalModules: ['@nestjs/core', '@nestjs/common', 'pg'],
+        minify: true,
+        sourceMap: true,
       },
-      securityGroups: [lambdaSecurityGroup],
+      vpc,
+      securityGroups: [lambdaSg],
       environment: {
-        DB_SECRET_ARN: database.secret?.secretArn || '',
+        DB_SECRET_ARN: database.secret!.secretArn,
         JWT_SECRET_ARN: jwtSecret.secretArn,
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
@@ -171,7 +169,7 @@ export class PrereqStack extends cdk.Stack {
     database.secret?.grantRead(apiLambda);
     jwtSecret.grantRead(apiLambda);
 
-    // API Gateway
+    // API Gateway with throttling protection
     const api = new apigateway.RestApi(this, 'PrereqAPI', {
       restApiName: 'PREREQ API',
       description: 'PREREQ Project Management API',
@@ -191,13 +189,47 @@ export class PrereqStack extends cdk.Stack {
       anyMethod: true,
     });
 
+    // WAFv2 WebACL for API protection
+    const webAcl = new wafv2.CfnWebACL(this, 'ApiWaf', {
+      defaultAction: { allow: {} },
+      scope: 'REGIONAL',
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: 'PrereqApiWaf',
+        sampledRequestsEnabled: true,
+      },
+      name: 'PrereqApiWaf',
+      rules: [
+        {
+          name: 'AWS-AWSManagedCommonRuleSet',
+          priority: 0,
+          statement: { managedRuleGroupStatement: {
+            name: 'AWSManagedRulesCommonRuleSet',
+            vendorName: 'AWS',
+          }},
+          overrideAction: { none: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'CommonRules',
+            sampledRequestsEnabled: true,
+          },
+        },
+      ],
+    });
+
+    // Associate WAF with API Gateway
+    new wafv2.CfnWebACLAssociation(this, 'ApiWafAssoc', {
+      webAclArn: webAcl.attrArn,
+      resourceArn: api.deploymentStage.stageArn,
+    });
+
     // Private S3 Bucket for Frontend
     const frontendBucket = new s3.Bucket(this, 'PrereqFrontendBucket', {
       bucketName: `prereq-frontend-${this.account}-${this.region}`,
       publicReadAccess: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
+      removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: !isProd,
     });
 
     // CloudFront Origin Access Identity
@@ -208,7 +240,7 @@ export class PrereqStack extends cdk.Stack {
     // Grant CloudFront read access to the bucket
     frontendBucket.grantRead(originAccessIdentity);
 
-    // CloudFront Distribution with OAI
+    // CloudFront Distribution with SPA-optimized caching
     const distribution = new cloudfront.Distribution(this, 'PrereqDistribution', {
       defaultBehavior: {
         origin: new origins.S3Origin(frontendBucket, {
@@ -217,6 +249,7 @@ export class PrereqStack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
       },
       defaultRootObject: 'index.html',
       errorResponses: [
@@ -224,38 +257,37 @@ export class PrereqStack extends cdk.Stack {
           httpStatus: 404,
           responseHttpStatus: 200,
           responsePagePath: '/index.html',
-          ttl: cdk.Duration.minutes(5),
+          ttl: cdk.Duration.seconds(0), // No caching for SPA routes
         },
         {
           httpStatus: 403,
           responseHttpStatus: 200,
           responsePagePath: '/index.html',
-          ttl: cdk.Duration.minutes(5),
+          ttl: cdk.Duration.seconds(0), // No caching for SPA routes
         },
       ],
     });
 
-    // Outputs
-    new cdk.CfnOutput(this, 'DatabaseEndpoint', {
-      value: database.instanceEndpoint.hostname,
+    // Store sensitive values in SSM Parameters instead of outputs
+    new ssm.StringParameter(this, 'DatabaseEndpointParam', {
+      parameterName: '/prereq/database/endpoint',
+      stringValue: database.instanceEndpoint.hostname,
       description: 'RDS Database Endpoint (private)',
     });
 
-    new cdk.CfnOutput(this, 'DatabasePort', {
-      value: database.instanceEndpoint.port.toString(),
-      description: 'RDS Database Port',
-    });
-
-    new cdk.CfnOutput(this, 'DatabaseSecretArn', {
-      value: database.secret?.secretArn || '',
+    new ssm.StringParameter(this, 'DatabaseSecretArnParam', {
+      parameterName: '/prereq/database/secret-arn',
+      stringValue: database.secret?.secretArn || '',
       description: 'RDS Database Secret ARN',
     });
 
-    new cdk.CfnOutput(this, 'JwtSecretArn', {
-      value: jwtSecret.secretArn,
+    new ssm.StringParameter(this, 'JwtSecretArnParam', {
+      parameterName: '/prereq/jwt/secret-arn',
+      stringValue: jwtSecret.secretArn,
       description: 'JWT Secret ARN',
     });
 
+    // Keep only public-facing outputs
     new cdk.CfnOutput(this, 'UserPoolId', {
       value: userPool.userPoolId,
       description: 'Cognito User Pool ID',
@@ -274,11 +306,6 @@ export class PrereqStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'FrontendUrl', {
       value: `https://${distribution.distributionDomainName}`,
       description: 'CloudFront Distribution URL',
-    });
-
-    new cdk.CfnOutput(this, 'FrontendBucketName', {
-      value: frontendBucket.bucketName,
-      description: 'S3 Frontend Bucket Name',
     });
   }
 } 
