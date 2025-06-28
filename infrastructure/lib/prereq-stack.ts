@@ -415,7 +415,7 @@ export class PrereqStack extends cdk.Stack {
     // CloudFront Distribution with SPA-optimized caching
     const distribution = new cloudfront.Distribution(this, 'PrereqDistribution', {
       defaultBehavior: {
-        origin: new origins.S3Origin(frontendBucket, {
+        origin: origins.S3BucketOrigin.withOriginAccessIdentity(frontendBucket, {
           originAccessIdentity,
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
