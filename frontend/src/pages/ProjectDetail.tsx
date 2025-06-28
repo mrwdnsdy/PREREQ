@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Upload, Calendar, DollarSign, Users } from 'lucide-react'
+import { Plus, Upload, Calendar, DollarSign, Users, BarChart3 } from 'lucide-react'
 import api from '../services/api'
 
 interface Project {
@@ -109,6 +109,10 @@ const ProjectDetail = () => {
               <button className="btn btn-secondary">
                 <Upload className="w-4 h-4 mr-2" />
                 Import P6
+              </button>
+              <button className="btn btn-secondary" onClick={() => navigate(`/schedule/${id}`)}>
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Schedule
               </button>
               <button className="btn btn-primary" onClick={() => navigate(`/projects/${id}/tasks/new`)}>
                 <Plus className="w-4 h-4 mr-2" />

@@ -111,7 +111,6 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
             className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 text-sky-800 text-xs rounded-full"
           >
             <span className="font-medium">{relation.predecessorWbs}</span>
-            <span className="text-sky-600">{relation.predecessorName}</span>
             
             {/* Relation Type Toggle */}
             <select

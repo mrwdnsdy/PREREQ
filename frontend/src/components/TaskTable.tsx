@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { FixedSizeList as List } from 'react-window'
+import React, { useState, useCallback } from 'react'
 import { DatePickerCell } from './DatePickerCell'
 import { RelationshipSelector } from './RelationshipSelector'
 import { Task } from '../services/scheduleApi'
@@ -98,21 +97,26 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
 
   return (
     <div
-      style={style}
       className={`
-        flex border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150
+        grid border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150 min-h-[48px]
         ${isSelected ? 'bg-sky-50 ring-1 ring-sky-200' : ''}
       `}
       onKeyDown={handleKeyDown}
       tabIndex={0}
+      style={{
+        ...style,
+        display: 'grid',
+        gridTemplateColumns: '120px 2fr 100px 140px 140px 200px 120px 100px',
+        minHeight: '48px'
+      }}
     >
       {/* WBS Path */}
-      <div className="w-24 px-4 py-2 text-sm font-mono text-gray-500 flex items-center border-r border-gray-200">
-        {task.wbsPath}
+      <div className="px-3 py-3 text-sm font-mono text-gray-500 flex items-center border-r border-gray-200 overflow-hidden">
+        <span className="truncate">{task.wbsPath}</span>
       </div>
 
       {/* Task Name */}
-      <div className="flex-1 min-w-48 px-4 py-2 border-r border-gray-200">
+      <div className="px-3 py-3 border-r border-gray-200 overflow-hidden">
         {isEditing && editingState.field === 'name' ? (
           <input
             type="text"
@@ -129,7 +133,8 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
         ) : (
           <div
             onClick={() => handleCellClick('name', task.name)}
-            className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors duration-150"
+            className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors duration-150 truncate"
+            title={task.name}
           >
             {task.name}
           </div>
@@ -137,7 +142,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
       </div>
 
       {/* Duration */}
-      <div className="w-24 px-4 py-2 border-r border-gray-200">
+      <div className="px-3 py-3 border-r border-gray-200 overflow-hidden">
         {isEditing && editingState.field === 'duration' ? (
           <input
             type="number"
@@ -149,7 +154,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
               if (e.key === 'Enter') onSaveEdit()
               if (e.key === 'Escape') onCancelEdit()
             }}
-            className="w-full px-2 py-1 text-sm border border-sky-500 rounded focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full px-2 py-1 text-sm border border-sky-500 rounded focus:outline-none focus:ring-1 focus:ring-sky-500 text-center"
             autoFocus
           />
         ) : (
@@ -163,7 +168,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
       </div>
 
       {/* Start Date */}
-      <div className="w-32 px-4 py-2 border-r border-gray-200">
+      <div className="px-3 py-3 border-r border-gray-200 overflow-hidden">
         <DatePickerCell
           value={task.startDate}
           onChange={(date) => {
@@ -175,16 +180,18 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
       </div>
 
       {/* End Date (read-only) */}
-      <div className="w-32 px-4 py-2 text-sm text-gray-500 flex items-center border-r border-gray-200">
-        {new Date(task.endDate).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        })}
+      <div className="px-3 py-3 text-sm text-gray-500 flex items-center border-r border-gray-200 overflow-hidden">
+        <span className="truncate">
+          {new Date(task.endDate).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          })}
+        </span>
       </div>
 
       {/* Predecessors */}
-      <div className="w-64 px-4 py-2 border-r border-gray-200">
+      <div className="px-3 py-3 border-r border-gray-200 overflow-hidden">
         <RelationshipSelector
           value={task.predecessors}
           onChange={(relations) => onUpdateTask(task.id, { predecessors: relations })}
@@ -196,7 +203,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
       </div>
 
       {/* Budget */}
-      <div className="w-32 px-4 py-2 border-r border-gray-200">
+      <div className="px-3 py-3 border-r border-gray-200 overflow-hidden">
         {isEditing && editingState.field === 'budget' ? (
           <input
             type="number"
@@ -209,13 +216,14 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
               if (e.key === 'Enter') onSaveEdit()
               if (e.key === 'Escape') onCancelEdit()
             }}
-            className="w-full px-2 py-1 text-sm border border-sky-500 rounded focus:outline-none focus:ring-1 focus:ring-sky-500"
+            className="w-full px-2 py-1 text-sm border border-sky-500 rounded focus:outline-none focus:ring-1 focus:ring-sky-500 text-right"
             autoFocus
           />
         ) : (
           <div
             onClick={() => handleCellClick('budget', task.budget)}
-            className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors duration-150 text-right"
+            className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors duration-150 text-right truncate"
+            title={formatCurrency(task.budget)}
           >
             {formatCurrency(task.budget)}
           </div>
@@ -223,23 +231,30 @@ const TaskRow: React.FC<TaskRowProps> = ({ index, style, data }) => {
       </div>
 
       {/* % Complete */}
-      <div className="w-32 px-4 py-2">
-        <div className="flex items-center gap-2">
+      <div className="px-3 py-3 overflow-hidden">
+        {isEditing && editingState.field === 'percentComplete' ? (
           <input
-            type="range"
+            type="number"
             min="0"
             max="100"
-            value={task.percentComplete}
-            onChange={(e) => onUpdateTask(task.id, { percentComplete: parseInt(e.target.value) })}
-            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, #0ea5e9 0%, #0ea5e9 ${task.percentComplete}%, #e5e7eb ${task.percentComplete}%, #e5e7eb 100%)`
+            value={editingState.value}
+            onChange={(e) => onStartEdit(task.id, 'percentComplete', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+            onBlur={onSaveEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSaveEdit()
+              if (e.key === 'Escape') onCancelEdit()
             }}
+            className="w-full px-2 py-1 text-sm border border-sky-500 rounded focus:outline-none focus:ring-1 focus:ring-sky-500 text-center"
+            autoFocus
           />
-          <span className="text-xs text-gray-500 w-8 text-right">
+        ) : (
+          <div
+            onClick={() => handleCellClick('percentComplete', task.percentComplete)}
+            className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors duration-150 text-center"
+          >
             {task.percentComplete}%
-          </span>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -260,7 +275,6 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     field: null,
     value: null
   })
-  const listRef = useRef<List>(null)
 
   const handleStartEdit = useCallback((taskId: string, field: string, value: any) => {
     setEditingState({ taskId, field, value })
@@ -289,15 +303,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     setEditingState({ taskId: null, field: null, value: null })
   }, [])
 
-  // Auto-scroll to selected task
-  useEffect(() => {
-    if (selectedTaskId && listRef.current) {
-      const taskIndex = tasks.findIndex(t => t.id === selectedTaskId)
-      if (taskIndex >= 0) {
-        listRef.current.scrollToItem(taskIndex, 'smart')
-      }
-    }
-  }, [selectedTaskId, tasks])
+
 
   const itemData = {
     tasks,
@@ -314,17 +320,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   }
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg overflow-hidden ${className}`}>
+    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden w-full ${className}`}>
       {/* Header */}
-      <div className="flex bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-        <div className="w-24 px-4 py-3 border-r border-gray-200">WBS</div>
-        <div className="flex-1 min-w-48 px-4 py-3 border-r border-gray-200">Task Name</div>
-        <div className="w-24 px-4 py-3 border-r border-gray-200 text-center">Duration</div>
-        <div className="w-32 px-4 py-3 border-r border-gray-200">Start Date</div>
-        <div className="w-32 px-4 py-3 border-r border-gray-200">End Date</div>
-        <div className="w-64 px-4 py-3 border-r border-gray-200">Predecessors</div>
-        <div className="w-32 px-4 py-3 border-r border-gray-200 text-right">Budget</div>
-        <div className="w-32 px-4 py-3">% Complete</div>
+      <div 
+        className="grid bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700 sticky top-0 z-10"
+        style={{ gridTemplateColumns: '120px 2fr 100px 140px 140px 200px 120px 100px' }}
+      >
+        <div className="px-3 py-3 border-r border-gray-200">WBS</div>
+        <div className="px-3 py-3 border-r border-gray-200">Task Name</div>
+        <div className="px-3 py-3 border-r border-gray-200 text-center">Duration</div>
+        <div className="px-3 py-3 border-r border-gray-200">Start Date</div>
+        <div className="px-3 py-3 border-r border-gray-200">End Date</div>
+        <div className="px-3 py-3 border-r border-gray-200">Predecessors</div>
+        <div className="px-3 py-3 border-r border-gray-200 text-right">Budget</div>
+        <div className="px-3 py-3">% Complete</div>
       </div>
 
       {/* Task Rows */}
@@ -333,15 +342,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           No tasks found. Add a WBS item and create tasks.
         </div>
       ) : (
-        <List
-          ref={listRef}
-          height={Math.min(tasks.length * 60, 600)} // Max height of 600px
-          itemCount={tasks.length}
-          itemSize={60}
-          itemData={itemData}
-        >
-          {TaskRow}
-        </List>
+        <div>
+          {tasks.map((task, index) => (
+            <TaskRow
+              key={task.id}
+              index={index}
+              style={{}}
+              data={itemData}
+            />
+          ))}
+        </div>
       )}
     </div>
   )

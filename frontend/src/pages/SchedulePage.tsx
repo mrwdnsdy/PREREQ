@@ -1,20 +1,14 @@
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Plus, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { WbsTree } from '../components/WbsTree'
 import { TaskTable } from '../components/TaskTable'
 import { useSchedule } from '../hooks/useSchedule'
 
-interface ToastMessage {
-  id: string
-  message: string
-  type: 'error' | 'success' | 'warning'
-}
-
 const SchedulePage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const [isTreeCollapsed, setIsTreeCollapsed] = useState(false)
-  const [toasts, setToasts] = useState<ToastMessage[]>([])
 
   const {
     wbsTree,
@@ -32,16 +26,6 @@ const SchedulePage: React.FC = () => {
     updateTask,
     deleteTask
   } = useSchedule(projectId || '')
-
-  const showToast = (message: string, type: ToastMessage['type'] = 'error') => {
-    const id = Date.now().toString()
-    const newToast: ToastMessage = { id, message, type }
-    setToasts(prev => [...prev, newToast])
-    
-    setTimeout(() => {
-      setToasts(prev => prev.filter(toast => toast.id !== id))
-    }, 5000)
-  }
 
   const handleAddWbs = () => {
     const newCode = `${wbsTree.length + 1}`
@@ -96,7 +80,7 @@ const SchedulePage: React.FC = () => {
 
   const handleAddTask = () => {
     if (wbsTree.length === 0) {
-      showToast('Please add a WBS item first before creating tasks')
+      toast.error('Please add a WBS item first before creating tasks')
       return
     }
 
@@ -118,7 +102,7 @@ const SchedulePage: React.FC = () => {
   }
 
   const handleCircularError = (message: string) => {
-    showToast(message, 'error')
+    toast.error(message)
   }
 
   const findWbsNode = (nodes: any[], nodeId: string): any => {
@@ -190,101 +174,76 @@ const SchedulePage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* WBS Tree Sidebar */}
-        <div className={`bg-white border-r border-gray-200 transition-all duration-300 ${
-          isTreeCollapsed ? 'w-12' : 'w-80'
-        }`}>
-          <div className="h-full flex flex-col">
-            {/* Tree Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-              {!isTreeCollapsed && (
-                <h2 className="text-sm font-medium text-gray-900">Work Breakdown Structure</h2>
-              )}
-              <button
-                onClick={() => setIsTreeCollapsed(!isTreeCollapsed)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors duration-150"
-              >
-                {isTreeCollapsed ? (
-                  <ChevronRight className="w-4 h-4 text-gray-500" />
-                ) : (
-                  <ChevronLeft className="w-4 h-4 text-gray-500" />
+      <div className="flex-1 flex justify-center overflow-hidden">
+        <div className="flex w-full max-w-7xl">
+          {/* WBS Tree Sidebar */}
+          <div className={`bg-white border-r border-gray-200 transition-all duration-300 ${
+            isTreeCollapsed ? 'w-12' : 'w-80'
+          }`}>
+            <div className="h-full flex flex-col">
+              {/* Tree Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                {!isTreeCollapsed && (
+                  <h2 className="text-sm font-medium text-gray-900">Work Breakdown Structure</h2>
                 )}
-              </button>
-            </div>
-
-            {/* Tree Content */}
-            {!isTreeCollapsed && (
-              <div className="flex-1 overflow-y-auto">
-                {wbsTree.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    <p className="text-sm">No WBS items yet.</p>
-                    <button
-                      onClick={handleAddWbs}
-                      className="mt-2 text-sm text-sky-600 hover:text-sky-700 font-medium"
-                    >
-                      Add your first WBS item
-                    </button>
-                  </div>
-                ) : (
-                  <WbsTree
-                    nodes={wbsTree}
-                    collapsedNodes={collapsedNodes}
-                    onToggleCollapse={toggleCollapse}
-                    onUpdateNode={updateWbsNode}
-                    onAddChild={handleAddChild}
-                    onAddSibling={handleAddSibling}
-                    onDeleteNode={deleteWbsNode}
-                    className="h-full"
-                  />
-                )}
+                <button
+                  onClick={() => setIsTreeCollapsed(!isTreeCollapsed)}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors duration-150"
+                >
+                  {isTreeCollapsed ? (
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                  ) : (
+                    <ChevronLeft className="w-4 h-4 text-gray-500" />
+                  )}
+                </button>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Task Table */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="p-6 h-full">
-            <TaskTable
-              tasks={tasks}
-              allTasks={tasks}
-              onUpdateTask={updateTask}
-              onDeleteTask={deleteTask}
-              selectedTaskId={selectedTask}
-              onSelectTask={setSelectedTask}
-              onCircularError={handleCircularError}
-              className="h-full"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`
-              px-4 py-3 rounded-md shadow-lg max-w-sm
-              ${toast.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' : ''}
-              ${toast.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : ''}
-              ${toast.type === 'warning' ? 'bg-yellow-50 text-yellow-800 border border-yellow-200' : ''}
-              transform transition-all duration-300 ease-in-out
-            `}
-          >
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <p className="text-sm font-medium">{toast.message}</p>
-              <button
-                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                className="ml-2 text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
+              {/* Tree Content */}
+              {!isTreeCollapsed && (
+                <div className="flex-1 overflow-y-auto">
+                  {wbsTree.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">
+                      <p className="text-sm">No WBS items yet.</p>
+                      <button
+                        onClick={handleAddWbs}
+                        className="mt-2 text-sm text-sky-600 hover:text-sky-700 font-medium"
+                      >
+                        Add your first WBS item
+                      </button>
+                    </div>
+                  ) : (
+                    <WbsTree
+                      nodes={wbsTree}
+                      collapsedNodes={collapsedNodes}
+                      onToggleCollapse={toggleCollapse}
+                      onUpdateNode={updateWbsNode}
+                      onAddChild={handleAddChild}
+                      onAddSibling={handleAddSibling}
+                      onDeleteNode={deleteWbsNode}
+                      className="h-full"
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        ))}
+
+          {/* Task Table */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 p-6">
+              <TaskTable
+                tasks={tasks}
+                allTasks={tasks}
+                onUpdateTask={updateTask}
+                onDeleteTask={deleteTask}
+                selectedTaskId={selectedTask}
+                onSelectTask={setSelectedTask}
+                onCircularError={handleCircularError}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
