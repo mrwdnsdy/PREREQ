@@ -23,7 +23,7 @@ export class PrereqStack extends cdk.Stack {
     const isProd = this.node.tryGetContext('env') === 'prod';
     
     // Developer IP for dev environment database access (configure this!)
-    const devIP = this.node.tryGetContext('devIP') || '0.0.0.0/0'; // Replace with your IP/32
+    const devIP = this.node.tryGetContext('devIP') || '104.28.133.17/32';
 
     // VPC with environment-aware NAT configuration
     const vpc = new ec2.Vpc(this, 'PrereqVPC', {
