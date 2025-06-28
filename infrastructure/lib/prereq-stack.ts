@@ -91,10 +91,10 @@ export class PrereqStack extends cdk.Stack {
       },
     });
 
-    // Add 30-day rotation for JWT secret
-    jwtSecret.addRotationSchedule('RotateMonthly', {
-      automaticallyAfter: cdk.Duration.days(30),
-    });
+    // Add 30-day rotation for JWT secret (requires rotationLambda or hostedRotation)
+    // jwtSecret.addRotationSchedule('RotateMonthly', {
+    //   automaticallyAfter: cdk.Duration.days(30),
+    // });
 
     // Cognito User Pool
     const userPool = new cognito.UserPool(this, 'PrereqUserPool', {
@@ -178,6 +178,13 @@ export class PrereqStack extends cdk.Stack {
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: ['Content-Type', 'Authorization'],
       },
+      deployOptions: {
+        stageName: isProd ? 'prod' : 'dev',
+        throttlingRateLimit: 50,
+        throttlingBurstLimit: 20,
+        metricsEnabled: true,
+        loggingLevel: apigateway.MethodLoggingLevel.INFO,
+      },
     });
 
     // API Gateway Integration
@@ -188,10 +195,6 @@ export class PrereqStack extends cdk.Stack {
       defaultIntegration: integration,
       anyMethod: true,
     });
-
-    // Note: API Gateway throttling would need to be configured manually in AWS Console
-    // or through lower-level CfnMethod constructs. The high-level RestApi construct
-    // in CDK v2 doesn't support throttling configuration through defaultMethodOptions.
 
     // WAFv2 WebACL for API protection
     const webAcl = new wafv2.CfnWebACL(this, 'ApiWaf', {
