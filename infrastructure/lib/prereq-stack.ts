@@ -194,6 +194,13 @@ export class PrereqStack extends cdk.Stack {
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
 
+    // Add monthly rotation for JWT secret in production
+    if (isProd) {
+      jwtSecret.addRotationSchedule('RotateMonthly', {
+        automaticallyAfter: cdk.Duration.days(30),
+      });
+    }
+
     // Cognito User Pool
     const userPool = new cognito.UserPool(this, 'PrereqUserPool', {
       userPoolName: 'prereq-users',
@@ -250,6 +257,8 @@ export class PrereqStack extends cdk.Stack {
     const currentThrottle = throttleConfig[env as keyof typeof throttleConfig];
 
     // Lambda Function using regular Function (no Docker required)
+    // When switching back to NodejsFunction, consider:
+    // bundling: { externalModules: ['@nestjs/*', 'pg'] }
     const apiLambda = new lambda.Function(this, 'PrereqAPILambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'main.handler',
@@ -498,13 +507,13 @@ export class PrereqStack extends cdk.Stack {
     }
 
     new cdk.CfnOutput(this, 'DatabaseEndpoint', {
-      value: database.instanceEndpoint.hostname,
+      value: isProd ? '<redacted>' : database.instanceEndpoint.hostname,
       description: 'Direct database endpoint',
     });
 
     if (dbProxy) {
       new cdk.CfnOutput(this, 'DatabaseProxyEndpoint', {
-        value: dbProxy.endpoint,
+        value: isProd ? '<redacted>' : dbProxy.endpoint,
         description: 'RDS Proxy endpoint',
       });
     }
