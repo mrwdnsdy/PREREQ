@@ -12,6 +12,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 
 export class PrereqStack extends cdk.Stack {
@@ -75,7 +76,7 @@ export class PrereqStack extends cdk.Stack {
       credentials: rds.Credentials.fromGeneratedSecret('prereq_admin'),
       publiclyAccessible: false,
       backupRetention: cdk.Duration.days(7),
-      deletionProtection: false, // Set to true for production
+      deletionProtection: isProd,
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
 
@@ -89,6 +90,7 @@ export class PrereqStack extends cdk.Stack {
         excludePunctuation: true,
         passwordLength: 32,
       },
+      removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
 
     // Add 30-day rotation for JWT secret (requires rotationLambda or hostedRotation)
@@ -169,6 +171,11 @@ export class PrereqStack extends cdk.Stack {
     database.secret?.grantRead(apiLambda);
     jwtSecret.grantRead(apiLambda);
 
+    // Access-log group
+    const apiLogs = new logs.LogGroup(this, 'PrereqApiLogs', {
+      retention: logs.RetentionDays.ONE_MONTH,
+    });
+
     // API Gateway with throttling protection
     const api = new apigateway.RestApi(this, 'PrereqAPI', {
       restApiName: 'PREREQ API',
@@ -184,6 +191,18 @@ export class PrereqStack extends cdk.Stack {
         throttlingBurstLimit: 20,
         metricsEnabled: true,
         loggingLevel: apigateway.MethodLoggingLevel.INFO,
+        accessLogDestination: new apigateway.LogGroupLogDestination(apiLogs),
+        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
+          caller: true,
+          httpMethod: true,
+          ip: true,
+          protocol: true,
+          requestTime: true,
+          resourcePath: true,
+          responseLength: true,
+          status: true,
+          user: true,
+        }),
       },
     });
 
@@ -221,6 +240,22 @@ export class PrereqStack extends cdk.Stack {
             sampledRequestsEnabled: true,
           },
         },
+        {
+          name: 'IpRateLimit',
+          priority: 1,
+          statement: {
+            rateBasedStatement: {
+              limit: 2000,         // 2 000 requests in 5 min per IP
+              aggregateKeyType: 'IP',
+            },
+          },
+          action: { block: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'IpRateLimit',
+            sampledRequestsEnabled: true,
+          },
+        },
       ],
     });
 
@@ -254,7 +289,7 @@ export class PrereqStack extends cdk.Stack {
           originAccessIdentity,
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
       },
