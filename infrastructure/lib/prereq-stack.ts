@@ -24,7 +24,7 @@ export class PrereqStack extends cdk.Stack {
     const isStage = env === 'stage';
     
     // Developer IP for dev environment database access
-    const devIP = this.node.tryGetContext('devIP') || '104.28.133.17/32';
+    const devIP = this.node.tryGetContext('devIP') || '70.30.4.207/32';
 
     // VPC configuration based on environment
     const vpc = new ec2.Vpc(this, 'PrereqVPC', {
@@ -116,11 +116,11 @@ export class PrereqStack extends cdk.Stack {
           allowAllOutbound: true,
         });
         
-        // Allow public access to proxy in stage (for founders/demo clients)
+        // Allow access to proxy in stage from your IP (change to anyIpv4() for demo clients)
         proxyPublicSg.addIngressRule(
-          ec2.Peer.anyIpv4(),
+          ec2.Peer.ipv4(devIP),
           ec2.Port.tcp(5432),
-          'Allow public access to RDS Proxy (stage only)'
+          'Allow access to RDS Proxy from dev IP (stage only)'
         );
 
         // Stage: Use both DB security group and public security group
