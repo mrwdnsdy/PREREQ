@@ -189,6 +189,10 @@ export class PrereqStack extends cdk.Stack {
       anyMethod: true,
     });
 
+    // Note: API Gateway throttling would need to be configured manually in AWS Console
+    // or through lower-level CfnMethod constructs. The high-level RestApi construct
+    // in CDK v2 doesn't support throttling configuration through defaultMethodOptions.
+
     // WAFv2 WebACL for API protection
     const webAcl = new wafv2.CfnWebACL(this, 'ApiWaf', {
       defaultAction: { allow: {} },
