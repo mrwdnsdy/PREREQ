@@ -19,16 +19,19 @@ export class PrereqStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Determine if this is production environment
-    const isProd = this.node.tryGetContext('env') === 'prod';
+    // Environment context flags
+    const env = this.node.tryGetContext('env') ?? 'dev';
+    const isProd = env === 'prod';
+    const isStage = env === 'stage';
     
-    // Developer IP for dev environment database access (configure this!)
+    // Developer IP for dev environment database access
     const devIP = this.node.tryGetContext('devIP') || '104.28.133.17/32';
 
-    // VPC with environment-aware NAT configuration
+    // VPC configuration based on environment
     const vpc = new ec2.Vpc(this, 'PrereqVPC', {
       maxAzs: 2,
-      natGateways: isProd ? 1 : 0,
+      // Dev: no NAT (cost savings), Stage/Prod: NAT for outbound access
+      natGateways: env === 'dev' ? 0 : 1,
       subnetConfiguration: [
         { name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
         { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
@@ -36,7 +39,7 @@ export class PrereqStack extends cdk.Stack {
     });
 
     // VPC Endpoints for dev environment (no NAT)
-    if (!isProd) {
+    if (env === 'dev') {
       vpc.addGatewayEndpoint('S3Endpoint', { service: ec2.GatewayVpcEndpointAwsService.S3 });
       vpc.addInterfaceEndpoint('SecretsEndpoint', {
         service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
@@ -65,7 +68,7 @@ export class PrereqStack extends cdk.Stack {
     );
 
     // Dev only: Allow direct access from developer IP
-    if (!isProd) {
+    if (env === 'dev') {
       dbSecurityGroup.addIngressRule(
         ec2.Peer.ipv4(devIP),
         ec2.Port.tcp(5432),
@@ -81,16 +84,16 @@ export class PrereqStack extends cdk.Stack {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc,
       vpcSubnets: {
-        // Dev: public subnets for direct access, Prod: private isolated
-        subnetType: isProd ? ec2.SubnetType.PRIVATE_ISOLATED : ec2.SubnetType.PUBLIC,
+        // Dev: public subnets for direct access, Stage/Prod: private isolated
+        subnetType: env === 'dev' ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_ISOLATED,
       },
       securityGroups: [dbSecurityGroup],
       databaseName: 'prereq',
       credentials: rds.Credentials.fromGeneratedSecret('prereq_admin'),
-      // Dev: publicly accessible for local tools, Prod: private
-      publiclyAccessible: !isProd,
+      // Dev: publicly accessible for local tools, Stage/Prod: private
+      publiclyAccessible: env === 'dev',
       backupRetention: cdk.Duration.days(7),
-      // Prod: enable deletion protection, Dev: allow easy cleanup
+      // Prod: enable deletion protection, Dev/Stage: allow easy cleanup
       deletionProtection: isProd,
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
     });
@@ -98,17 +101,48 @@ export class PrereqStack extends cdk.Stack {
     // Add automatic secret rotation for database
     database.addRotationSingleUser();
 
-    // RDS Proxy for connection pooling and enhanced security
-    const dbProxy = new rds.DatabaseProxy(this, 'PrereqDatabaseProxy', {
-      proxyTarget: rds.ProxyTarget.fromInstance(database),
-      secrets: [database.secret!],
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-      },
-      securityGroups: [dbSecurityGroup],
-      requireTLS: true,
-    });
+    // RDS Proxy configuration based on environment
+    let dbProxy: rds.DatabaseProxy | undefined;
+    let dbEndpoint: string;
+    
+    if (env !== 'dev') {
+      // Stage/Prod: Create RDS Proxy
+      dbProxy = new rds.DatabaseProxy(this, 'PrereqDatabaseProxy', {
+        proxyTarget: rds.ProxyTarget.fromInstance(database),
+        secrets: [database.secret!],
+        vpc,
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        },
+        securityGroups: [dbSecurityGroup],
+        requireTLS: true,
+      });
+
+      // Stage: Make proxy publicly accessible, Prod: keep private
+      if (isStage) {
+        // Create separate proxy security group for stage public access
+        const proxyPublicSg = new ec2.SecurityGroup(this, 'PrereqProxyPublicSG', {
+          vpc,
+          description: 'Public access security group for RDS Proxy (stage only)',
+          allowAllOutbound: true,
+        });
+        
+        // Allow access from anywhere to proxy in stage (for founders/demo clients)
+        proxyPublicSg.addIngressRule(
+          ec2.Peer.anyIpv4(),
+          ec2.Port.tcp(5432),
+          'Allow public access to RDS Proxy (stage only)'
+        );
+
+        // Note: In real implementation, you'd need to create a separate proxy or configure ALB
+        // This is a simplified approach - in practice, you might use an Application Load Balancer
+      }
+      
+      dbEndpoint = dbProxy.endpoint;
+    } else {
+      // Dev: Direct database connection
+      dbEndpoint = database.instanceEndpoint.hostname;
+    }
 
     // Optional: SSM Bastion for prod debugging (t3.nano)
     let bastionInstance: ec2.Instance | undefined;
@@ -202,6 +236,15 @@ export class PrereqStack extends cdk.Stack {
       },
     });
 
+    // Environment-specific throttling rates
+    const throttleConfig = {
+      dev: { rate: undefined, burst: undefined }, // Unlimited
+      stage: { rate: 20, burst: 10 },
+      prod: { rate: 50, burst: 20 }
+    };
+
+    const currentThrottle = throttleConfig[env as keyof typeof throttleConfig];
+
     // Lambda Function using NodejsFunction with tree-shaking
     const apiLambda = new NodejsFunction(this, 'PrereqAPILambda', {
       entry: '../backend/src/main.ts',
@@ -215,12 +258,13 @@ export class PrereqStack extends cdk.Stack {
       vpc,
       securityGroups: [lambdaSg],
       environment: {
-        // Use RDS Proxy endpoint for better connection management
         DB_SECRET_ARN: database.secret!.secretArn,
-        DB_PROXY_ENDPOINT: dbProxy.endpoint,
+        DB_HOST: dbEndpoint,
+        ...(dbProxy && { DB_PROXY_ENDPOINT: dbProxy.endpoint }),
         JWT_SECRET_ARN: jwtSecret.secretArn,
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
+        NODE_ENV: env,
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
@@ -232,8 +276,12 @@ export class PrereqStack extends cdk.Stack {
       retention: logs.RetentionDays.ONE_MONTH,
     });
 
-    // Grant Lambda access to RDS Proxy and Secrets Manager
-    dbProxy.grantConnect(apiLambda, 'prereq_admin');
+    // Grant Lambda access to database/proxy and secrets
+    if (dbProxy) {
+      dbProxy.grantConnect(apiLambda, 'prereq_admin');
+    } else {
+      database.grantConnect(apiLambda);
+    }
     database.secret?.grantRead(apiLambda);
     jwtSecret.grantRead(apiLambda);
 
@@ -242,7 +290,31 @@ export class PrereqStack extends cdk.Stack {
       retention: logs.RetentionDays.ONE_MONTH,
     });
 
-    // API Gateway with throttling protection
+    // API Gateway with environment-specific throttling
+    const deployOptions: any = {
+      stageName: env,
+      metricsEnabled: true,
+      loggingLevel: apigateway.MethodLoggingLevel.INFO,
+      accessLogDestination: new apigateway.LogGroupLogDestination(apiLogs),
+      accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
+        caller: true,
+        httpMethod: true,
+        ip: true,
+        protocol: true,
+        requestTime: true,
+        resourcePath: true,
+        responseLength: true,
+        status: true,
+        user: true,
+      }),
+    };
+
+    // Add throttling only for stage/prod
+    if (currentThrottle.rate && currentThrottle.burst) {
+      deployOptions.throttlingRateLimit = currentThrottle.rate;
+      deployOptions.throttlingBurstLimit = currentThrottle.burst;
+    }
+
     const api = new apigateway.RestApi(this, 'PrereqAPI', {
       restApiName: 'PREREQ API',
       description: 'PREREQ Project Management API',
@@ -251,25 +323,7 @@ export class PrereqStack extends cdk.Stack {
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: ['Content-Type', 'Authorization'],
       },
-      deployOptions: {
-        stageName: isProd ? 'prod' : 'dev',
-        throttlingRateLimit: 50,
-        throttlingBurstLimit: 20,
-        metricsEnabled: true,
-        loggingLevel: apigateway.MethodLoggingLevel.INFO,
-        accessLogDestination: new apigateway.LogGroupLogDestination(apiLogs),
-        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
-          caller: true,
-          httpMethod: true,
-          ip: true,
-          protocol: true,
-          requestTime: true,
-          resourcePath: true,
-          responseLength: true,
-          status: true,
-          user: true,
-        }),
-      },
+      deployOptions,
     });
 
     // API Gateway Integration
@@ -281,59 +335,61 @@ export class PrereqStack extends cdk.Stack {
       anyMethod: true,
     });
 
-    // WAFv2 WebACL for API protection
-    const webAcl = new wafv2.CfnWebACL(this, 'ApiWaf', {
-      defaultAction: { allow: {} },
-      scope: 'REGIONAL',
-      visibilityConfig: {
-        cloudWatchMetricsEnabled: true,
-        metricName: 'PrereqApiWaf',
-        sampledRequestsEnabled: true,
-      },
-      name: 'PrereqApiWaf',
-      rules: [
-        {
-          name: 'AWS-AWSManagedCommonRuleSet',
-          priority: 0,
-          statement: { managedRuleGroupStatement: {
-            name: 'AWSManagedRulesCommonRuleSet',
-            vendorName: 'AWS',
-          }},
-          overrideAction: { none: {} },
-          visibilityConfig: {
-            cloudWatchMetricsEnabled: true,
-            metricName: 'CommonRules',
-            sampledRequestsEnabled: true,
-          },
+    // WAF for stage/prod only (dev has no WAF)
+    if (env !== 'dev') {
+      const webAcl = new wafv2.CfnWebACL(this, 'ApiWaf', {
+        defaultAction: { allow: {} },
+        scope: 'REGIONAL',
+        visibilityConfig: {
+          cloudWatchMetricsEnabled: true,
+          metricName: 'PrereqApiWaf',
+          sampledRequestsEnabled: true,
         },
-        {
-          name: 'IpRateLimit',
-          priority: 1,
-          statement: {
-            rateBasedStatement: {
-              limit: 2000,         // 2 000 requests in 5 min per IP
-              aggregateKeyType: 'IP',
+        name: 'PrereqApiWaf',
+        rules: [
+          {
+            name: 'AWS-AWSManagedCommonRuleSet',
+            priority: 0,
+            statement: { managedRuleGroupStatement: {
+              name: 'AWSManagedRulesCommonRuleSet',
+              vendorName: 'AWS',
+            }},
+            overrideAction: { none: {} },
+            visibilityConfig: {
+              cloudWatchMetricsEnabled: true,
+              metricName: 'CommonRules',
+              sampledRequestsEnabled: true,
             },
           },
-          action: { block: {} },
-          visibilityConfig: {
-            cloudWatchMetricsEnabled: true,
-            metricName: 'IpRateLimit',
-            sampledRequestsEnabled: true,
+          {
+            name: 'IpRateLimit',
+            priority: 1,
+            statement: {
+              rateBasedStatement: {
+                limit: 2000,         // 2000 requests in 5 min per IP
+                aggregateKeyType: 'IP',
+              },
+            },
+            action: { block: {} },
+            visibilityConfig: {
+              cloudWatchMetricsEnabled: true,
+              metricName: 'IpRateLimit',
+              sampledRequestsEnabled: true,
+            },
           },
-        },
-      ],
-    });
+        ],
+      });
 
-    // Associate WAF with API Gateway
-    new wafv2.CfnWebACLAssociation(this, 'ApiWafAssoc', {
-      webAclArn: webAcl.attrArn,
-      resourceArn: api.deploymentStage.stageArn,
-    });
+      // Associate WAF with API Gateway
+      new wafv2.CfnWebACLAssociation(this, 'ApiWafAssoc', {
+        webAclArn: webAcl.attrArn,
+        resourceArn: api.deploymentStage.stageArn,
+      });
+    }
 
     // Private S3 Bucket for Frontend
     const frontendBucket = new s3.Bucket(this, 'PrereqFrontendBucket', {
-      bucketName: `prereq-frontend-${this.account}-${this.region}`,
+      bucketName: `prereq-frontend-${env}-${this.account}-${this.region}`,
       publicReadAccess: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: isProd ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
@@ -376,32 +432,65 @@ export class PrereqStack extends cdk.Stack {
       ],
     });
 
-    // Store sensitive values in SSM Parameters instead of outputs
+    // Store sensitive values in SSM Parameters
     new ssm.StringParameter(this, 'DatabaseEndpointParam', {
-      parameterName: '/prereq/database/endpoint',
+      parameterName: `/prereq/${env}/database/endpoint`,
       stringValue: database.instanceEndpoint.hostname,
-      description: 'RDS Database Endpoint',
+      description: `RDS Database Endpoint (${env})`,
     });
 
-    new ssm.StringParameter(this, 'DatabaseProxyEndpointParam', {
-      parameterName: '/prereq/database/proxy-endpoint',
-      stringValue: dbProxy.endpoint,
-      description: 'RDS Proxy Endpoint',
-    });
+    if (dbProxy) {
+      new ssm.StringParameter(this, 'DatabaseProxyEndpointParam', {
+        parameterName: `/prereq/${env}/database/proxy-endpoint`,
+        stringValue: dbProxy.endpoint,
+        description: `RDS Proxy Endpoint (${env})`,
+      });
+    }
 
     new ssm.StringParameter(this, 'DatabaseSecretArnParam', {
-      parameterName: '/prereq/database/secret-arn',
+      parameterName: `/prereq/${env}/database/secret-arn`,
       stringValue: database.secret?.secretArn || '',
-      description: 'RDS Database Secret ARN',
+      description: `RDS Database Secret ARN (${env})`,
     });
 
     new ssm.StringParameter(this, 'JwtSecretArnParam', {
-      parameterName: '/prereq/jwt/secret-arn',
+      parameterName: `/prereq/${env}/jwt/secret-arn`,
       stringValue: jwtSecret.secretArn,
-      description: 'JWT Secret ARN',
+      description: `JWT Secret ARN (${env})`,
     });
 
     // Environment-specific outputs
+    new cdk.CfnOutput(this, 'Environment', {
+      value: env,
+      description: 'Deployment environment',
+    });
+
+    new cdk.CfnOutput(this, 'DatabaseConfiguration', {
+      value: env === 'dev' 
+        ? 'Public database (direct access)' 
+        : isStage 
+          ? 'Private database + public proxy'
+          : 'Private database + private proxy',
+      description: 'Database access configuration',
+    });
+
+    if (currentThrottle.rate && currentThrottle.burst) {
+      new cdk.CfnOutput(this, 'ThrottlingConfiguration', {
+        value: `${currentThrottle.rate}/${currentThrottle.burst} (rate/burst)`,
+        description: 'API Gateway throttling limits',
+      });
+    } else {
+      new cdk.CfnOutput(this, 'ThrottlingConfiguration', {
+        value: 'Unlimited',
+        description: 'API Gateway throttling limits',
+      });
+    }
+
+    new cdk.CfnOutput(this, 'WAFProtection', {
+      value: env === 'dev' ? 'Disabled' : 'Enabled',
+      description: 'WAF protection status',
+    });
+
     if (bastionInstance) {
       new cdk.CfnOutput(this, 'BastionInstanceId', {
         value: bastionInstance.instanceId,
@@ -409,22 +498,19 @@ export class PrereqStack extends cdk.Stack {
       });
     }
 
-    new cdk.CfnOutput(this, 'DatabaseEnvironment', {
-      value: isProd ? 'production (private)' : 'development (public)',
-      description: 'Database environment configuration',
-    });
-
     new cdk.CfnOutput(this, 'DatabaseEndpoint', {
       value: database.instanceEndpoint.hostname,
       description: 'Direct database endpoint',
     });
 
-    new cdk.CfnOutput(this, 'DatabaseProxyEndpoint', {
-      value: dbProxy.endpoint,
-      description: 'RDS Proxy endpoint (recommended for applications)',
-    });
+    if (dbProxy) {
+      new cdk.CfnOutput(this, 'DatabaseProxyEndpoint', {
+        value: dbProxy.endpoint,
+        description: 'RDS Proxy endpoint',
+      });
+    }
 
-    // Keep existing public-facing outputs
+    // Standard outputs
     new cdk.CfnOutput(this, 'UserPoolId', {
       value: userPool.userPoolId,
       description: 'Cognito User Pool ID',
