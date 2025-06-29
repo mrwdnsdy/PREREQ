@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Upload, Calendar, DollarSign, Users, BarChart3 } from 'lucide-react'
+import { TaskTable } from '../components/TaskTable'
+import { useTasks, Task } from '../hooks/useTasks'
 import api from '../services/api'
 
 interface Project {
@@ -18,37 +20,47 @@ interface Project {
     }
     role: string
   }>
-  tasks: Task[]
-}
-
-interface Task {
-  id: string
-  title: string
-  wbsCode: string
-  level: number
-  isMilestone: boolean
-  startDate: string
-  endDate: string
-  parentId?: string
-  children: Task[]
-  predecessors: any[]
-  successors: any[]
 }
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const { data: project, isLoading } = useQuery<Project>({
+  const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
-    queryFn: async () => {
-      const response = await api.get(`/projects/${id}`)
-      return response.data
-    },
-    enabled: !!id,
+    queryFn: () => api.get(`/projects/${id}`).then(res => res.data),
+    enabled: !!id
   })
 
-  if (isLoading) {
+  // Use the shared tasks hook
+  const {
+    tasks,
+    isLoading: tasksLoading,
+    updateTask,
+    deleteTask,
+    addTask,
+    isUpdating,
+    isDeleting,
+    isAdding
+  } = useTasks(id || '')
+
+  const handleUpdateTask = (taskId: string, updates: Partial<Task>) => {
+    updateTask(taskId, updates)
+  }
+
+  const handleDeleteTask = (taskId: string) => {
+    deleteTask(taskId)
+  }
+
+  const handleAddTask = async (taskData: Partial<Task>) => {
+    addTask(taskData)
+  }
+
+  const handleCircularError = (message: string) => {
+    console.error('Circular dependency error:', message)
+  }
+
+  if (projectLoading || tasksLoading) {
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
@@ -67,31 +79,6 @@ const ProjectDetail = () => {
       </div>
     )
   }
-
-  const renderTask = (task: Task, depth: number = 0) => (
-    <div key={task.id} className="border-l-2 border-gray-200 ml-4">
-      <div
-        className="flex items-center py-2 px-4 hover:bg-gray-50"
-        style={{ paddingLeft: `${depth * 24 + 16}px` }}
-      >
-        <div className="flex-1">
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-gray-900">{task.title}</span>
-            {task.isMilestone && (
-              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                Milestone
-              </span>
-            )}
-          </div>
-          <div className="flex items-center text-xs text-gray-500 mt-1">
-            <span className="mr-3">WBS: {task.wbsCode}</span>
-            <span>Level: {task.level}</span>
-          </div>
-        </div>
-      </div>
-      {task.children?.map((child) => renderTask(child, depth + 1))}
-    </div>
-  )
 
   return (
     <div className="space-y-6">
@@ -166,13 +153,13 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      {/* WBS Structure */}
+      {/* Tasks Table */}
       <div className="card">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Work Breakdown Structure</h2>
+          <h2 className="text-lg font-medium text-gray-900">Project Tasks</h2>
         </div>
         <div className="p-6">
-          {project.tasks.length === 0 ? (
+          {!tasks || tasks.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-sm text-gray-500">No tasks defined yet.</p>
               <button className="mt-4 btn btn-primary" onClick={() => navigate(`/projects/${id}/tasks/new`)}>
@@ -181,11 +168,16 @@ const ProjectDetail = () => {
               </button>
             </div>
           ) : (
-            <div className="space-y-1">
-              {project.tasks
-                .filter(task => !task.parentId)
-                .map(task => renderTask(task))}
-            </div>
+            <TaskTable
+              tasks={tasks}
+              allTasks={tasks}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onAddTask={handleAddTask}
+              selectedTaskId={null}
+              onSelectTask={() => {}}
+              onCircularError={handleCircularError}
+            />
           )}
         </div>
       </div>

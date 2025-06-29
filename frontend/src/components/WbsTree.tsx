@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { ChevronRight, ChevronDown, MoreVertical, Plus, Trash2, Edit3 } from 'lucide-react'
+import { MoreVertical, Plus, Trash2, Edit3, ArrowRight } from 'lucide-react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
@@ -23,6 +23,8 @@ interface SortableWbsNodeProps {
   node: WbsNode
   depth: number
   isCollapsed: boolean
+  collapsedNodes: Set<string>
+  selectedNodeId?: string
   onToggleCollapse: (nodeId: string) => void
   onUpdateNode: (nodeId: string, updates: Partial<WbsNode>) => void
   onAddChild: (parentId: string) => void
@@ -32,10 +34,15 @@ interface SortableWbsNodeProps {
   isSelected: boolean
 }
 
+// Function to get level icon based on level
+
+
 const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
   node,
   depth,
   isCollapsed,
+  collapsedNodes,
+  selectedNodeId,
   onToggleCollapse,
   onUpdateNode,
   onAddChild,
@@ -120,17 +127,31 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
   }
 
   const contextMenuItems = [
-    {
-      label: 'Add Child',
-      icon: Plus,
+    ...(node.children.length > 0 ? [{
+      label: isCollapsed ? 'Expand' : 'Collapse',
+      icon: isCollapsed ? Plus : Edit3,
       onClick: () => {
-        onAddChild(node.id)
+        onToggleCollapse(node.id)
         setShowContextMenu(false)
       }
+    }] : []),
+    {
+      label: node.level >= 10 ? 'Max depth reached (10 levels)' : `Add Child (Level ${node.level + 1})`,
+      icon: Plus,
+      onClick: () => {
+        if (node.level >= 10) {
+          alert('Maximum WBS depth of 10 levels reached. Cannot add more child levels.')
+          setShowContextMenu(false)
+          return
+        }
+        onAddChild(node.id)
+        setShowContextMenu(false)
+      },
+      disabled: node.level >= 10
     },
     {
-      label: 'Add Sibling',
-      icon: Plus,
+      label: `Add Sibling (Level ${node.level})`,
+      icon: ArrowRight,
       onClick: () => {
         onAddSibling(node.id)
         setShowContextMenu(false)
@@ -149,7 +170,9 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
       label: 'Delete',
       icon: Trash2,
       onClick: () => {
-        onDeleteNode(node.id)
+        if (confirm(`Delete "${node.name}" and all its children?`)) {
+          onDeleteNode(node.id)
+        }
         setShowContextMenu(false)
       },
       className: 'text-red-600 hover:bg-red-50'
@@ -160,36 +183,62 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
     <div ref={setNodeRef} style={style}>
       <div
         className={`
-          flex items-center gap-1 py-1 pr-2 rounded hover:bg-sky-50 cursor-pointer select-none
-          transition-colors duration-150 group
+          flex items-center gap-2 py-1.5 pr-2 rounded hover:bg-sky-50 cursor-pointer select-none
+          transition-colors duration-150 group relative
           ${isSelected ? 'bg-sky-50 border-l-2 border-sky-500' : ''}
+          ${node.level === 9 ? 'border-l-2 border-amber-400' : ''}
+          ${node.level === 10 ? 'border-l-2 border-red-400' : ''}
         `}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleNodeClick}
-        onContextMenu={handleContextMenu}
-        {...attributes}
-        {...listeners}
       >
-        {/* Chevron */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleCollapse(node.id)
-          }}
-          className="p-0.5 hover:bg-gray-200 rounded transition-colors duration-150"
-          style={{ visibility: node.children.length > 0 ? 'visible' : 'hidden' }}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-gray-600" />
-          )}
-        </button>
+        {/* 3-Dot Menu Button */}
+        <div className="flex-shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleContextMenu(e)
+            }}
+            className="p-1 hover:bg-gray-200 rounded transition-colors duration-150 opacity-60 group-hover:opacity-100"
+            title="Options"
+          >
+            <MoreVertical className="w-3 h-3 text-gray-600" />
+          </button>
+        </div>
 
-        {/* WBS Code */}
-        <span className="text-xs text-gray-400">
-          {node.code}
-        </span>
+        {/* Level Number */}
+        <div className="flex-shrink-0">
+          <span 
+            className={`
+              inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-semibold
+              ${node.level === 1 ? 'bg-blue-100 text-blue-800' : ''}
+              ${node.level === 2 ? 'bg-green-100 text-green-800' : ''}
+              ${node.level === 3 ? 'bg-purple-100 text-purple-800' : ''}
+              ${node.level === 4 ? 'bg-orange-100 text-orange-800' : ''}
+              ${node.level === 5 ? 'bg-pink-100 text-pink-800' : ''}
+              ${node.level === 6 ? 'bg-indigo-100 text-indigo-800' : ''}
+              ${node.level === 7 ? 'bg-teal-100 text-teal-800' : ''}
+              ${node.level === 8 ? 'bg-red-100 text-red-800' : ''}
+              ${node.level === 9 ? 'bg-amber-100 text-amber-800' : ''}
+              ${node.level === 10 ? 'bg-gray-100 text-gray-800' : ''}
+            `}
+            title={`Level ${node.level}`}
+          >
+            {node.level}
+          </span>
+        </div>
+
+        {/* WBS Code - Drag Handle */}
+        <div className="flex-shrink-0 min-w-[50px]">
+          <span 
+            className="text-xs text-gray-400 cursor-grab active:cursor-grabbing font-mono"
+            {...attributes}
+            {...listeners}
+            title={`Level ${node.level} - Drag to reorder`}
+          >
+            {node.code}
+          </span>
+        </div>
 
         {/* Name */}
         <div className="flex-1 min-w-0">
@@ -216,16 +265,7 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
           )}
         </div>
 
-        {/* Context Menu Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            handleContextMenu(e)
-          }}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all duration-150"
-        >
-          <MoreVertical className="w-4 h-4 text-gray-500" />
-        </button>
+
       </div>
 
       {/* Context Menu */}
@@ -242,10 +282,14 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
             <button
               key={index}
               onClick={item.onClick}
+              disabled={item.disabled}
               className={`
-                w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2
+                w-full px-3 py-2 text-left text-sm flex items-center gap-2
                 transition-colors duration-150
-                ${item.className || 'text-gray-700'}
+                ${item.disabled 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : `hover:bg-gray-50 ${item.className || 'text-gray-700'}`
+                }
               `}
             >
               <item.icon className="w-4 h-4" />
@@ -263,14 +307,16 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
               key={child.id}
               node={child}
               depth={depth + 1}
-              isCollapsed={false} // Will be handled by parent's collapsed state
+              isCollapsed={collapsedNodes.has(child.id)}
+              collapsedNodes={collapsedNodes}
+              selectedNodeId={selectedNodeId}
               onToggleCollapse={onToggleCollapse}
               onUpdateNode={onUpdateNode}
               onAddChild={onAddChild}
               onAddSibling={onAddSibling}
               onDeleteNode={onDeleteNode}
               onSelectNode={onSelectNode}
-              isSelected={isSelected}
+              isSelected={selectedNodeId === child.id}
             />
           ))}
         </SortableContext>
@@ -291,6 +337,12 @@ export const WbsTree: React.FC<WbsTreeProps> = ({
   selectedNodeId,
   className = ''
 }) => {
+  
+  const handleAddRoot = () => {
+    // Create a new root level WBS node
+    const newCode = `${nodes.length + 1}`
+    onAddChild('') // Empty string for root level
+  }
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -327,30 +379,67 @@ export const WbsTree: React.FC<WbsTreeProps> = ({
   const flatNodes = flattenNodes(nodes)
 
   return (
-    <div className={`bg-white border-r border-gray-200 overflow-y-auto ${className}`}>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={flatNodes.map(node => node.id)} strategy={verticalListSortingStrategy}>
-          {nodes.map((node) => (
-            <SortableWbsNode
-              key={node.id}
-              node={node}
-              depth={0}
-              isCollapsed={collapsedNodes.has(node.id)}
-              onToggleCollapse={onToggleCollapse}
-              onUpdateNode={onUpdateNode}
-              onAddChild={onAddChild}
-              onAddSibling={onAddSibling}
-              onDeleteNode={onDeleteNode}
-              onSelectNode={onSelectNode}
-              isSelected={selectedNodeId === node.id}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
+    <div className={`bg-white border-r border-gray-200 overflow-auto ${className}`} style={{ minWidth: '250px' }}>
+      {/* Header with Add Root Button */}
+      <div className="sticky top-0 bg-white border-b border-gray-200 p-3 z-10">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-700">WBS Structure</h3>
+            <p className="text-xs text-gray-500">Maximum 10 levels</p>
+          </div>
+          <button
+            onClick={handleAddRoot}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-50 text-green-700 hover:bg-green-100 rounded-md transition-colors duration-150 font-medium"
+            title="Add Root Level Item"
+          >
+            <Plus className="w-4 h-4" />
+            Add Root
+          </button>
+        </div>
+      </div>
+
+      {/* Tree Content */}
+      <div className="p-2" style={{ minWidth: '220px' }}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={flatNodes.map(node => node.id)} strategy={verticalListSortingStrategy}>
+            {nodes.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                <div className="text-sm">No WBS items yet</div>
+                <button
+                  onClick={handleAddRoot}
+                  className="mt-2 text-xs text-green-600 hover:text-green-700 underline"
+                >
+                  Add your first item
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {nodes.map((node) => (
+                  <SortableWbsNode
+                    key={node.id}
+                    node={node}
+                    depth={0}
+                    isCollapsed={collapsedNodes.has(node.id)}
+                    collapsedNodes={collapsedNodes}
+                    selectedNodeId={selectedNodeId}
+                    onToggleCollapse={onToggleCollapse}
+                    onUpdateNode={onUpdateNode}
+                    onAddChild={onAddChild}
+                    onAddSibling={onAddSibling}
+                    onDeleteNode={onDeleteNode}
+                    onSelectNode={onSelectNode}
+                    isSelected={selectedNodeId === node.id}
+                  />
+                ))}
+              </div>
+            )}
+          </SortableContext>
+        </DndContext>
+      </div>
     </div>
   )
 } 

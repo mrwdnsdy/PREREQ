@@ -44,6 +44,10 @@ export const useSchedule = (projectId: string) => {
     mutationFn: (node: Partial<WbsNode>) => scheduleApi.createWbsNode(projectId, node),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedule', projectId] })
+    },
+    onError: (error: Error) => {
+      // This error will be handled by the component that calls addWbsNode
+      console.error('WBS creation failed:', error.message)
     }
   })
 
@@ -66,6 +70,10 @@ export const useSchedule = (projectId: string) => {
     mutationFn: (task: Partial<Task>) => scheduleApi.createTask(projectId, task),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedule', projectId] })
+    },
+    onError: (error: Error) => {
+      // This error will be handled by the component that calls addTask
+      console.error('Task creation failed:', error.message)
     }
   })
 
@@ -118,7 +126,7 @@ export const useSchedule = (projectId: string) => {
   }
 
   const addWbsNode = (node: Partial<WbsNode>) => {
-    createWbsMutation.mutate(node)
+    return createWbsMutation.mutateAsync(node)
   }
 
   const updateWbsNode = (nodeId: string, updates: Partial<WbsNode>) => {
@@ -130,7 +138,7 @@ export const useSchedule = (projectId: string) => {
   }
 
   const addTask = (task: Partial<Task>) => {
-    createTaskMutation.mutate(task)
+    return createTaskMutation.mutateAsync(task)
   }
 
   const updateTask = (taskId: string, updates: Partial<Task>) => {

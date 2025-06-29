@@ -1,6 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, ChevronDown } from 'lucide-react'
-import { Task, TaskRelation } from '../services/scheduleApi'
+import { Task } from '../hooks/useTasks'
+
+// Task relation interface that matches what useTasks expects
+interface TaskRelation {
+  id: string
+  predecessorId: string
+  type: string
+  lag: number
+  predecessor: {
+    id: string
+    name: string
+    wbsPath: string
+  }
+}
 
 interface RelationshipSelectorProps {
   value: TaskRelation[]
@@ -64,8 +77,11 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
       predecessorId: task.id,
       type: selectedRelationType,
       lag: 0,
-      predecessorName: task.name,
-      predecessorWbs: task.wbsPath
+      predecessor: {
+        id: task.id,
+        name: task.name,
+        wbsPath: task.wbsPath
+      }
     }
 
     // Check for circular dependency (basic check - could be enhanced)
@@ -110,7 +126,7 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
             key={relation.id}
             className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 group"
           >
-            <span className="font-medium">{relation.predecessorWbs}</span>
+            <span className="font-medium">{relation.predecessor.wbsPath}</span>
             
             {/* Relation Type Toggle */}
             <select
@@ -160,7 +176,7 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => setIsOpen(true)}
               onKeyDown={handleKeyDown}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
             />
             <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           </div>
@@ -170,7 +186,7 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
         {isOpen && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
             {filteredTasks.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-500">
+              <div className="px-3 py-2 text-xs text-gray-500">
                 {searchTerm ? 'No matching tasks found' : 'No available predecessors'}
               </div>
             ) : (
@@ -182,8 +198,8 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-medium text-gray-900">{task.wbsPath}</span>
-                      <span className="ml-2 text-gray-600">{task.name}</span>
+                      <span className="font-medium text-gray-900 text-xs">{task.wbsPath}</span>
+                      <span className="ml-2 text-gray-600 text-xs">{task.name}</span>
                     </div>
                     <span className="text-xs text-gray-500">
                       {task.startDate} - {task.endDate}

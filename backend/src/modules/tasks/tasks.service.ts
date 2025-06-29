@@ -24,6 +24,51 @@ export class TasksService {
     });
   }
 
+  private async validateWbsHierarchy(parentId: string | null, projectId: string, desiredLevel?: number): Promise<void> {
+    // If no parent, this is a level 1 task - always allowed
+    if (!parentId) return;
+
+    // Get the parent task
+    const parent = await this.prisma.task.findFirst({
+      where: {
+        id: parentId,
+        projectId: projectId,
+      },
+      select: { level: true },
+    });
+
+    if (!parent) {
+      throw new BadRequestException('Parent task not found');
+    }
+
+    const childLevel = parent.level + 1;
+
+    // If a desired level is specified, validate it matches the calculated level
+    if (desiredLevel && desiredLevel !== childLevel) {
+      throw new BadRequestException(`Invalid WBS level. Task with parent at level ${parent.level} must be at level ${childLevel}, but level ${desiredLevel} was specified.`);
+    }
+
+    // Check if there are any gaps in the hierarchy for this project
+    // For example, can't create level 3 if no level 2 exists
+    if (childLevel > 1) {
+      const hasRequiredParentLevel = await this.prisma.task.findFirst({
+        where: {
+          projectId: projectId,
+          level: childLevel - 1,
+        },
+      });
+
+      if (!hasRequiredParentLevel) {
+        throw new BadRequestException(`Cannot create level ${childLevel} task. You must first create a level ${childLevel - 1} task.`);
+      }
+    }
+
+    // Additional validation: ensure the parent is actually at the level we expect
+    if (parent.level !== childLevel - 1) {
+      throw new BadRequestException(`Invalid parent relationship. Parent task is at level ${parent.level}, but child would be at level ${childLevel}.`);
+    }
+  }
+
   async create(createTaskDto: CreateTaskDto, userId: string) {
     // Check project access
     const hasAccess = await this.authService.hasProjectAccess(userId, createTaskDto.projectId, 'PM');
@@ -33,6 +78,9 @@ export class TasksService {
 
     // Calculate level based on parent
     const level = await this.calculateLevel(createTaskDto.parentId, createTaskDto.projectId);
+
+    // Validate WBS hierarchy rules
+    await this.validateWbsHierarchy(createTaskDto.parentId, createTaskDto.projectId, level);
 
     // Validate parent is in same project
     if (createTaskDto.parentId) {
@@ -147,10 +195,12 @@ export class TasksService {
       throw new ForbiddenException('Insufficient permissions');
     }
 
-    // If changing parent, recalculate level
+    // If changing parent, recalculate level and validate hierarchy
     let level = task.level;
     if (updateTaskDto.parentId !== undefined && updateTaskDto.parentId !== task.parentId) {
       level = await this.calculateLevel(updateTaskDto.parentId, task.projectId);
+      // Validate WBS hierarchy rules for the new parent relationship
+      await this.validateWbsHierarchy(updateTaskDto.parentId, task.projectId, level);
     }
 
     const updatedTask = await this.prisma.task.update({

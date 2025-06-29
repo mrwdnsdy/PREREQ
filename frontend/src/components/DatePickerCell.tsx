@@ -88,7 +88,7 @@ export const DatePickerCell: React.FC<DatePickerCellProps> = ({
         readOnly
         disabled={disabled}
         className={`
-          w-full px-2 py-1 text-sm border-0 bg-transparent cursor-pointer
+          w-full px-1 py-0.5 text-xs border-0 bg-transparent cursor-pointer
           hover:bg-gray-50 focus:bg-white focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50
           rounded transition-colors duration-150
           ${disabled ? 'cursor-not-allowed opacity-50' : ''}
