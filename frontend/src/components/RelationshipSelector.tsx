@@ -108,7 +108,7 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
         {value.map((relation) => (
           <div
             key={relation.id}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 text-sky-800 text-xs rounded-full"
+            className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 group"
           >
             <span className="font-medium">{relation.predecessorWbs}</span>
             
@@ -128,7 +128,7 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
 
             <button
               onClick={() => removeRelation(relation.id)}
-              className="text-sky-600 hover:text-sky-800 transition-colors duration-150"
+              className="text-sky-600 hover:text-sky-800 transition-colors duration-150 opacity-0 group-hover:opacity-100"
             >
               <X className="w-3 h-3" />
             </button>

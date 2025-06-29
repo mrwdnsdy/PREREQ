@@ -1,14 +1,31 @@
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, AlertCircle, ClipboardIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { WbsTree } from '../components/WbsTree'
 import { TaskTable } from '../components/TaskTable'
 import { useSchedule } from '../hooks/useSchedule'
 
+const EmptyState: React.FC<{
+  icon: React.ReactNode
+  title: string
+  actionText: string
+  onAction: () => void
+}> = ({ icon, title, actionText, onAction }) => (
+  <div className="flex flex-col items-center justify-center py-12">
+    {icon}
+    <h3 className="mt-4 text-lg font-semibold text-gray-900">{title}</h3>
+    <button
+      onClick={onAction}
+      className="mt-4 inline-flex items-center gap-1 rounded-md bg-sky-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-sky-700 focus:ring-2 focus:ring-sky-500"
+    >
+      {actionText}
+    </button>
+  </div>
+)
+
 const SchedulePage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
-  const [isTreeCollapsed, setIsTreeCollapsed] = useState(false)
 
   const {
     wbsTree,
@@ -140,112 +157,85 @@ const SchedulePage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Project Schedule
-            </h1>
-            <span className="text-sm text-gray-500">
-              {projectId}
-            </span>
-          </div>
+    <main className="h-screen grid grid-rows-[auto_1fr]">
+      {/* Top bar */}
+      <header className="h-14 flex items-center justify-between border-b bg-white/80 backdrop-blur px-6">
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold text-gray-900">
+            Project Schedule
+          </h1>
+          <span className="text-sm text-gray-500">
+            {projectId}
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleAddWbs}
+            className="inline-flex items-center gap-1 rounded-md border border-sky-600 px-4 py-1.5 text-sm font-semibold text-sky-600 hover:bg-sky-50 focus:ring-2 focus:ring-sky-500"
+          >
+            <Plus className="w-4 h-4" />
+            Add WBS
+          </button>
           
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleAddWbs}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-md transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add WBS
-            </button>
-            
-            <button
-              onClick={handleAddTask}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-md transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Task
-            </button>
-          </div>
+          <button
+            onClick={handleAddTask}
+            className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-sky-700 focus:ring-2 focus:ring-sky-500"
+          >
+            <Plus className="w-4 h-4" />
+            Add Task
+          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="flex-1 flex justify-center overflow-hidden">
-        <div className="flex w-full max-w-7xl">
-          {/* WBS Tree Sidebar */}
-          <div className={`bg-white border-r border-gray-200 transition-all duration-300 ${
-            isTreeCollapsed ? 'w-12' : 'w-80'
-          }`}>
-            <div className="h-full flex flex-col">
-              {/* Tree Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-                {!isTreeCollapsed && (
-                  <h2 className="text-sm font-medium text-gray-900">Work Breakdown Structure</h2>
-                )}
-                <button
-                  onClick={() => setIsTreeCollapsed(!isTreeCollapsed)}
-                  className="p-1 hover:bg-gray-100 rounded transition-colors duration-150"
-                >
-                  {isTreeCollapsed ? (
-                    <ChevronRight className="w-4 h-4 text-gray-500" />
-                  ) : (
-                    <ChevronLeft className="w-4 h-4 text-gray-500" />
-                  )}
-                </button>
-              </div>
-
-              {/* Tree Content */}
-              {!isTreeCollapsed && (
-                <div className="flex-1 overflow-y-auto">
-                  {wbsTree.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
-                      <p className="text-sm">No WBS items yet.</p>
-                      <button
-                        onClick={handleAddWbs}
-                        className="mt-2 text-sm text-sky-600 hover:text-sky-700 font-medium"
-                      >
-                        Add your first WBS item
-                      </button>
-                    </div>
-                  ) : (
-                    <WbsTree
-                      nodes={wbsTree}
-                      collapsedNodes={collapsedNodes}
-                      onToggleCollapse={toggleCollapse}
-                      onUpdateNode={updateWbsNode}
-                      onAddChild={handleAddChild}
-                      onAddSibling={handleAddSibling}
-                      onDeleteNode={deleteWbsNode}
-                      className="h-full"
-                    />
-                  )}
-                </div>
-              )}
+      {/* Content */}
+      <div className="grid grid-cols-[280px_1fr] overflow-hidden max-md:grid-cols-1">
+        <aside className="border-r overflow-y-auto bg-white max-md:hidden">
+          {wbsTree.length === 0 ? (
+            <div className="p-4 text-center text-gray-500">
+              <p className="text-sm">No WBS items yet.</p>
+              <button
+                onClick={handleAddWbs}
+                className="mt-2 text-sm text-sky-600 hover:text-sky-700 font-medium"
+              >
+                Add your first WBS item
+              </button>
             </div>
-          </div>
+          ) : (
+            <WbsTree
+              nodes={wbsTree}
+              collapsedNodes={collapsedNodes}
+              onToggleCollapse={toggleCollapse}
+              onUpdateNode={updateWbsNode}
+              onAddChild={handleAddChild}
+              onAddSibling={handleAddSibling}
+              onDeleteNode={deleteWbsNode}
+            />
+          )}
+        </aside>
 
-          {/* Task Table */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 p-6">
-              <TaskTable
-                tasks={tasks}
-                allTasks={tasks}
-                onUpdateTask={updateTask}
-                onDeleteTask={deleteTask}
-                selectedTaskId={selectedTask}
-                onSelectTask={setSelectedTask}
-                onCircularError={handleCircularError}
-                className="w-full"
-              />
-            </div>
-          </div>
-        </div>
+        <section className="overflow-auto p-6">
+          {tasks.length === 0 ? (
+            <EmptyState
+              icon={<ClipboardIcon className="h-10 w-10 text-gray-300" />}
+              title="No tasks yet"
+              actionText="+ Add Task"
+              onAction={handleAddTask}
+            />
+          ) : (
+            <TaskTable
+              tasks={tasks}
+              allTasks={tasks}
+              onUpdateTask={updateTask}
+              onDeleteTask={deleteTask}
+              selectedTaskId={selectedTask}
+              onSelectTask={setSelectedTask}
+              onCircularError={handleCircularError}
+            />
+          )}
+        </section>
       </div>
-    </div>
+    </main>
   )
 }
 

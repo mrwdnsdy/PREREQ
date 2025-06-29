@@ -2,6 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom responsive grid for schedule layout */
+@media (max-width: 767px) {
+  .grid-cols-\[280px_1fr\] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .max-md\:hidden {
+    display: none !important;
+  }
+}
+
+/* Indent guide lines for WBS hierarchy */
+.indent-guide::before {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed theme("colors.gray.300");
+}
+
+/* Custom button styles */
+.btn {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-500;
+}
+
+.btn-secondary {
+  @apply border border-sky-600 text-sky-600 hover:bg-sky-50 focus:ring-sky-500;
+}
+
 @layer base {
   html {
     font-family: system-ui, sans-serif;

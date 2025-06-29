@@ -160,11 +160,11 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
     <div ref={setNodeRef} style={style}>
       <div
         className={`
-          flex items-center py-1 px-2 hover:bg-gray-50 cursor-pointer select-none
+          flex items-center gap-1 py-1 pr-2 rounded hover:bg-sky-50 cursor-pointer select-none
           transition-colors duration-150 group
           ${isSelected ? 'bg-sky-50 border-l-2 border-sky-500' : ''}
         `}
-        style={{ paddingLeft: `${depth * 20 + 8}px` }}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleNodeClick}
         onContextMenu={handleContextMenu}
         {...attributes}
@@ -176,7 +176,7 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
             e.stopPropagation()
             onToggleCollapse(node.id)
           }}
-          className="mr-1 p-0.5 hover:bg-gray-200 rounded transition-colors duration-150"
+          className="p-0.5 hover:bg-gray-200 rounded transition-colors duration-150"
           style={{ visibility: node.children.length > 0 ? 'visible' : 'hidden' }}
         >
           {isCollapsed ? (
@@ -187,7 +187,7 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
         </button>
 
         {/* WBS Code */}
-        <span className="text-sm font-mono text-gray-500 mr-2 min-w-0">
+        <span className="text-xs text-gray-400">
           {node.code}
         </span>
 
@@ -202,12 +202,14 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
               onBlur={handleNameSubmit}
               onKeyDown={handleKeyDown}
               className="w-full px-1 py-0.5 text-sm border border-sky-500 rounded focus:outline-none focus:ring-1 focus:ring-sky-500"
-              onClick={(e) => e.stopPropagation()}
             />
           ) : (
             <span
-              onClick={handleNameClick}
-              className="text-sm text-gray-900 truncate block hover:text-sky-600 transition-colors duration-150"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleNameClick()
+              }}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors duration-150"
             >
               {node.name}
             </span>
@@ -222,7 +224,7 @@ const SortableWbsNode: React.FC<SortableWbsNodeProps> = ({
           }}
           className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all duration-150"
         >
-          <MoreVertical className="w-3 h-3 text-gray-500" />
+          <MoreVertical className="w-4 h-4 text-gray-500" />
         </button>
       </div>
 
