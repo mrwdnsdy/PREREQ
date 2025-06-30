@@ -10,9 +10,9 @@ interface BackendTask {
   startDate: string
   endDate: string
   isMilestone: boolean
-  costLabor: number
-  costMaterial: number
-  costOther: number
+  costLabor: number | { toString(): string } // Decimal from database
+  costMaterial: number | { toString(): string } // Decimal from database
+  costOther: number | { toString(): string } // Decimal from database
   level: number
   projectId: string
   parentId?: string
@@ -80,6 +80,11 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
   const endDate = new Date(backendTask.endDate)
   const duration = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)
   
+  // Safely convert Decimal values to numbers for budget calculation
+  const costLabor = typeof backendTask.costLabor === 'number' ? backendTask.costLabor : Number(backendTask.costLabor.toString())
+  const costMaterial = typeof backendTask.costMaterial === 'number' ? backendTask.costMaterial : Number(backendTask.costMaterial.toString())
+  const costOther = typeof backendTask.costOther === 'number' ? backendTask.costOther : Number(backendTask.costOther.toString())
+  
   return {
     id: backendTask.id,
     name: backendTask.title,
@@ -96,7 +101,7 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
         wbsPath: p.predecessor.wbsCode
       }
     })),
-    budget: backendTask.costLabor + backendTask.costMaterial + backendTask.costOther,
+    budget: (isNaN(costLabor) ? 0 : costLabor) + (isNaN(costMaterial) ? 0 : costMaterial) + (isNaN(costOther) ? 0 : costOther),
     percentComplete: 0, // This field doesn't exist in backend yet
     isMilestone: backendTask.isMilestone,
     level: backendTask.level,

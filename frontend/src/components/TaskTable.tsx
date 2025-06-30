@@ -2,8 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { Task } from '../hooks/useTasks'
 import { TaskRelation } from '../services/scheduleApi'
 import { DatePickerCell } from './DatePickerCell'
-import { RelationshipSelector } from './RelationshipSelector'
-import { Plus, Trash2, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, Edit2, Copy, Scissors } from 'lucide-react'
 
 interface TaskTableProps {
   tasks: Task[]
@@ -32,6 +31,13 @@ interface NewRowState {
   budget: number
 }
 
+interface ContextMenuState {
+  visible: boolean
+  x: number
+  y: number
+  taskId: string | null
+}
+
 export const TaskTable: React.FC<TaskTableProps> = ({
   tasks,
   allTasks,
@@ -57,42 +63,45 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     budget: 0
   })
 
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    taskId: null
+  })
+
   // Common styling classes
-  const cell = "text-center align-middle py-1 px-1"
-  const head = "sticky top-0 z-10 bg-white text-center text-xs font-semibold text-gray-500"
+  const cell = "text-center align-middle py-2 px-2"
+  const head = "sticky top-0 z-10 bg-white text-center text-sm font-semibold text-gray-500 py-3"
 
   // Enhanced WBS helper functions
   const getWbsLevel = (wbsPath: string): number => {
     if (!wbsPath) return 1
-    // Remove trailing zeros and count meaningful levels
+    // For level 0 (root project), wbsPath is "0"
+    if (wbsPath === '0') return 0
+    // Count meaningful levels, excluding trailing zeros
     const parts = wbsPath.split('.').filter(part => part !== '0' && part !== '')
     return Math.max(1, parts.length)
   }
 
   const formatWbsCode = (wbsPath: string): string => {
     if (!wbsPath) return '1.0'
+    // For level 0 root project, just return "0"
+    if (wbsPath === '0') return '0'
+    
+    // For other levels, keep the actual structure without adding trailing zeros
     const parts = wbsPath.split('.')
-    // Ensure each part has at least one digit, pad with .0 if needed
-    const formattedParts = parts.map(part => {
-      const num = parseInt(part) || 1
-      return num.toString()
-    })
-    
-    // Add trailing zeros to match P6 style (e.g., 1.1 becomes 1.1.0.0.0)
-    while (formattedParts.length < 5) {
-      formattedParts.push('0')
-    }
-    
-    return formattedParts.join('.')
+    return parts.join('.')
   }
 
   const getIndentationLevel = (wbsPath: string): number => {
-    return Math.max(0, getWbsLevel(wbsPath) - 1)
+    return Math.max(0, getWbsLevel(wbsPath))
   }
 
   const getRowBackgroundColor = (wbsPath: string): string => {
     const level = getWbsLevel(wbsPath)
     const colors = [
+      'bg-slate-50',        // Level 0: Light slate - Project root
       'bg-blue-50',         // Level 1: Light blue - Project phases
       'bg-green-50',        // Level 2: Light green - Major work packages
       'bg-purple-50',       // Level 3: Light purple - Work packages
@@ -104,12 +113,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       'bg-amber-50',        // Level 9: Light amber - Sub-details
       'bg-gray-50'          // Level 10: Light gray - Maximum depth
     ]
-    return colors[Math.min(level - 1, colors.length - 1)] || 'bg-white'
+    return colors[Math.min(level, colors.length - 1)] || 'bg-white'
   }
 
   const getWbsTextColor = (wbsPath: string): string => {
     const level = getWbsLevel(wbsPath)
     const colors = [
+      'text-slate-900 font-black',      // Level 0: Very dark slate, black weight - Project root
       'text-blue-800 font-bold',        // Level 1: Dark blue, bold
       'text-green-800 font-bold',       // Level 2: Dark green, bold
       'text-purple-800 font-semibold',  // Level 3: Dark purple, semibold
@@ -121,12 +131,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       'text-amber-800',                 // Level 9: Dark amber, normal
       'text-gray-800'                   // Level 10: Dark gray, normal
     ]
-    return colors[Math.min(level - 1, colors.length - 1)] || 'text-gray-600'
+    return colors[Math.min(level, colors.length - 1)] || 'text-gray-600'
   }
 
   const getTaskNameTextColor = (wbsPath: string): string => {
     const level = getWbsLevel(wbsPath)
     const colors = [
+      'text-slate-900 font-black',      // Level 0: Very dark slate, black weight - Project root
       'text-blue-900 font-bold',        // Level 1: Very dark blue, bold
       'text-green-900 font-bold',       // Level 2: Very dark green, bold
       'text-purple-800 font-semibold',  // Level 3: Dark purple, semibold
@@ -138,12 +149,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       'text-amber-700',                 // Level 9: Dark amber, normal
       'text-gray-700'                   // Level 10: Dark gray, normal
     ]
-    return colors[Math.min(level - 1, colors.length - 1)] || 'text-gray-700'
+    return colors[Math.min(level, colors.length - 1)] || 'text-gray-700'
   }
 
   const getBorderColor = (wbsPath: string): string => {
     const level = getWbsLevel(wbsPath)
     const colors = [
+      'border-slate-300',    // Level 0
       'border-blue-200',     // Level 1
       'border-green-200',    // Level 2
       'border-purple-200',   // Level 3
@@ -155,7 +167,19 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       'border-amber-200',    // Level 9
       'border-gray-200'      // Level 10
     ]
-    return colors[Math.min(level - 1, colors.length - 1)] || 'border-gray-200'
+    return colors[Math.min(level, colors.length - 1)] || 'border-gray-200'
+  }
+
+  // Calculate budget rollup for a task (includes children)
+  const calculateBudgetRollup = (task: Task): number => {
+    const childTasks = tasks.filter(t => t.parentId === task.id)
+    if (childTasks.length === 0) {
+      // Leaf task - return its direct budget
+      return task.budget || 0
+    } else {
+      // Parent task - sum children budgets
+      return childTasks.reduce((sum, child) => sum + calculateBudgetRollup(child), 0)
+    }
   }
 
   // Helper function to generate next WBS code
@@ -201,32 +225,27 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           updates.endDate = endDate.toISOString().split('T')[0]
         }
       }
-
-      // Handle WBS path changes
-      if (editingState.field === 'wbsPath') {
-        updates.wbsPath = editingState.value
-      }
       
       onUpdateTask(editingState.taskId, updates)
     }
+    
     setEditingState({ taskId: null, field: null, value: null })
-  }, [editingState, tasks, onUpdateTask])
+  }, [editingState, onUpdateTask, tasks])
 
   const handleCancelEdit = useCallback(() => {
     setEditingState({ taskId: null, field: null, value: null })
   }, [])
 
   const handleCellClick = (taskId: string, field: string, value: any) => {
-    onSelectTask(taskId)
-    handleStartEdit(taskId, field, value)
+    setEditingState({ taskId, field, value })
   }
 
   const handleAddRow = (afterTaskId?: string) => {
-    const nextWbs = generateNextWbsCode(afterTaskId)
+    const wbsPath = generateNextWbsCode(afterTaskId)
     setNewRowState({
       isAdding: true,
       afterTaskId,
-      wbsPath: nextWbs,
+      wbsPath,
       name: '',
       duration: 1,
       startDate: new Date().toISOString().split('T')[0],
@@ -235,25 +254,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   }
 
   const handleSaveNewRow = async () => {
-    if (!newRowState.name.trim()) return
-
-    const endDate = new Date(newRowState.startDate)
-    endDate.setDate(endDate.getDate() + newRowState.duration - 1)
-
-    const newTask: Partial<Task> = {
-      wbsPath: newRowState.wbsPath,
-      name: newRowState.name,
-      duration: newRowState.duration,
-      startDate: newRowState.startDate,
-      endDate: endDate.toISOString().split('T')[0],
-      budget: newRowState.budget,
-      percentComplete: 0,
-      predecessors: []
-    }
-
     try {
+      const newTask: Partial<Task> = {
+        wbsPath: newRowState.wbsPath,
+        name: newRowState.name || 'New Task',
+        duration: newRowState.duration,
+        startDate: newRowState.startDate,
+        endDate: calculateEndDate(newRowState.startDate, newRowState.duration),
+        budget: newRowState.budget,
+        isMilestone: false,
+        predecessors: []
+      }
+
       await onAddTask(newTask)
-      // Reset form only on success
+      
       setNewRowState({
         isAdding: false,
         wbsPath: '',
@@ -262,9 +276,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         startDate: new Date().toISOString().split('T')[0],
         budget: 0
       })
-    } catch (error: any) {
-      // Show error message
-      onCircularError?.(error.message || 'Failed to create task')
+    } catch (error) {
+      console.error('Failed to add task:', error)
     }
   }
 
@@ -279,88 +292,126 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     })
   }
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
+  const formatCurrency = (value: number | string) => {
+    // Handle potential string or Decimal values from database
+    const numValue = typeof value === 'string' ? parseFloat(value) : value
+    
+    // Handle invalid or very large numbers
+    if (isNaN(numValue) || !isFinite(numValue)) return '$0'
+    if (numValue === 0) return '$0'
+    
+    // Handle extremely large numbers that might cause scientific notation
+    if (numValue > 1e15) {
+      console.warn('Extremely large budget value detected:', numValue)
+      return '$0' // Fallback for unrealistic values
+    }
+    
+    if (numValue >= 1000000000) {
+      return `$${(numValue / 1000000000).toFixed(1)}B`
+    } else if (numValue >= 1000000) {
+      return `$${(numValue / 1000000).toFixed(1)}M`
+    } else if (numValue >= 1000) {
+      return `$${(numValue / 1000).toFixed(0)}K`
+    }
+    return `$${Math.round(numValue).toLocaleString()}`
   }
 
   const calculateEndDate = (startDate: string, duration: number) => {
-    const start = new Date(startDate)
-    const end = new Date(start)
-    end.setDate(end.getDate() + duration - 1)
-    return end.toISOString().split('T')[0]
+    const endDate = new Date(startDate)
+    endDate.setDate(endDate.getDate() + duration - 1)
+    return endDate.toISOString().split('T')[0]
+  }
+
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    })
   }
 
   const isEditing = (taskId: string, field: string) => 
     editingState.taskId === taskId && editingState.field === field
 
+  // Right-click context menu handlers
+  const handleRightClick = (e: React.MouseEvent, taskId: string) => {
+    e.preventDefault()
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      taskId
+    })
+  }
+
+  const hideContextMenu = () => {
+    setContextMenu({ visible: false, x: 0, y: 0, taskId: null })
+  }
+
+  const handleContextMenuAction = (action: string) => {
+    if (contextMenu.taskId) {
+      switch (action) {
+        case 'add':
+          handleAddRow(contextMenu.taskId)
+          break
+        case 'edit':
+          const task = tasks.find(t => t.id === contextMenu.taskId)
+          if (task) {
+            setEditingState({ taskId: task.id, field: 'name', value: task.name })
+          }
+          break
+        case 'copy':
+          // TODO: Implement copy functionality
+          console.log('Copy task:', contextMenu.taskId)
+          break
+        case 'cut':
+          // TODO: Implement cut functionality
+          console.log('Cut task:', contextMenu.taskId)
+          break
+        case 'delete':
+          onDeleteTask(contextMenu.taskId)
+          break
+      }
+    }
+    hideContextMenu()
+  }
+
+  // Click outside handler for context menu
+  React.useEffect(() => {
+    const handleClickOutside = () => hideContextMenu()
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [contextMenu.visible])
+
   const renderNewRow = () => {
-    const level = getWbsLevel(newRowState.wbsPath)
-    const indentLevel = getIndentationLevel(newRowState.wbsPath)
-    const bgColor = getRowBackgroundColor(newRowState.wbsPath)
-    const borderColor = getBorderColor(newRowState.wbsPath)
+    if (!newRowState.isAdding) return null
 
     return (
-      <tr className={`${bgColor} border-2 border-sky-300 border-l-4 ${borderColor}`}>
+      <tr className="bg-sky-50 border-l-4 border-sky-400">
         {/* WBS Path */}
         <td className={`${cell} rounded-l-md border border-r-0 border-gray-200`}>
-          <div className="flex items-center justify-center gap-1">
-            {/* Level Badge */}
-            <span className={`inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full ${
-              level === 1 ? 'bg-slate-600 text-white' :
-              level === 2 ? 'bg-blue-600 text-white' :
-              level === 3 ? 'bg-green-600 text-white' :
-              level === 4 ? 'bg-yellow-600 text-white' :
-              level === 5 ? 'bg-purple-600 text-white' :
-              level === 6 ? 'bg-pink-600 text-white' :
-              level === 7 ? 'bg-indigo-600 text-white' :
-              'bg-orange-600 text-white'
-            }`}>
-              {level}
-            </span>
-            
-            <input
-              type="text"
-              value={newRowState.wbsPath}
-              onChange={(e) => setNewRowState({ ...newRowState, wbsPath: e.target.value })}
-              className="flex-1 rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs font-mono"
-              placeholder="1.1"
-            />
-          </div>
+          <input
+            type="text"
+            value={newRowState.wbsPath}
+            onChange={(e) => setNewRowState(prev => ({ ...prev, wbsPath: e.target.value }))}
+            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs font-mono"
+            placeholder="WBS"
+          />
         </td>
 
-        {/* Task Name with Indentation */}
+        {/* Task Name */}
         <td className={`${cell} border border-x-0 border-gray-200`}>
-          <div className="flex items-center" style={{ paddingLeft: `${indentLevel * 20}px` }}>
-            {/* Indentation guides */}
-            {Array.from({ length: indentLevel }, (_, i) => (
-              <div key={i} className="w-4 h-4 flex items-center justify-center">
-                <div className="w-px h-full bg-gray-300"></div>
-              </div>
-            ))}
-            
-            {/* Level indicator */}
-            {level > 1 && (
-              <ChevronRight className="w-3 h-3 text-gray-400 mr-1 flex-shrink-0" />
-            )}
-            
-            <input
-              type="text"
-              value={newRowState.name}
-              onChange={(e) => setNewRowState({ ...newRowState, name: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveNewRow()
-                if (e.key === 'Escape') handleCancelNewRow()
-              }}
-              className="flex-1 rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-              placeholder="Task name"
-              autoFocus
-            />
-          </div>
+          <input
+            type="text"
+            value={newRowState.name}
+            onChange={(e) => setNewRowState(prev => ({ ...prev, name: e.target.value }))}
+            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+            placeholder="Task name"
+            autoFocus
+          />
         </td>
 
         {/* Duration */}
@@ -369,7 +420,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             type="number"
             min="1"
             value={newRowState.duration}
-            onChange={(e) => setNewRowState({ ...newRowState, duration: parseInt(e.target.value) || 1 })}
+            onChange={(e) => setNewRowState(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
             className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
           />
         </td>
@@ -379,38 +430,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <input
             type="date"
             value={newRowState.startDate}
-            onChange={(e) => setNewRowState({ ...newRowState, startDate: e.target.value })}
-            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
+            onChange={(e) => setNewRowState(prev => ({ ...prev, startDate: e.target.value }))}
+            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
           />
         </td>
 
         {/* End Date (calculated) */}
         <td className={`${cell} border border-x-0 border-gray-200`}>
-          <span className="text-gray-500 text-sm">
-            {calculateEndDate(newRowState.startDate, newRowState.duration)}
+          <span className="text-gray-500 text-xs">
+            {formatDate(calculateEndDate(newRowState.startDate, newRowState.duration))}
           </span>
         </td>
 
-        {/* Predecessors */}
-        <td className={`${cell} border border-x-0 border-gray-200`}>
-          <span className="text-gray-400 text-sm">None</span>
-        </td>
-
         {/* Budget */}
-        <td className={`${cell} border border-x-0 border-gray-200`}>
-          <input
-            type="number"
-            min="0"
-            step="100"
-            value={newRowState.budget}
-            onChange={(e) => setNewRowState({ ...newRowState, budget: parseFloat(e.target.value) || 0 })}
-            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
-          />
-        </td>
-
-        {/* Actions */}
         <td className={`${cell} rounded-r-md border border-l-0 border-gray-200`}>
-          <div className="flex items-center justify-center gap-1">
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={newRowState.budget}
+              onChange={(e) => setNewRowState(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
+              className="flex-1 rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
+              placeholder="0"
+            />
             <button
               onClick={handleSaveNewRow}
               className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
@@ -423,7 +466,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
               title="Cancel"
             >
-              ✗
+              ✕
             </button>
           </div>
         </td>
@@ -433,7 +476,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   const renderAddButton = (afterTaskId?: string) => (
     <tr className="group">
-      <td colSpan={8} className="py-1">
+      <td colSpan={6} className="py-1">
         <button
           onClick={() => handleAddRow(afterTaskId)}
           className="w-full py-1 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1"
@@ -446,40 +489,34 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   )
 
   return (
-    <div className="relative overflow-auto">
-      <table className="w-full border-separate border-spacing-y-1 text-xs">
+    <div className="relative overflow-hidden w-full h-full">
+      <table className="w-full border-separate border-spacing-y-1 text-sm">
         <thead>
           <tr>
-            <th className={head} style={{ width: '100px' }}>
+            <th className={head} style={{ width: '10%', minWidth: '100px' }}>
               WBS Code
             </th>
-            <th className={head} style={{ minWidth: '150px' }}>
+            <th className={head} style={{ width: '35%', minWidth: '200px' }}>
               Task Name
             </th>
-            <th className={head} style={{ width: '60px' }}>
+            <th className={head} style={{ width: '10%', minWidth: '80px' }}>
               Duration
             </th>
-            <th className={head} style={{ width: '220px' }}>
+            <th className={head} style={{ width: '15%', minWidth: '120px' }}>
               Start Date
             </th>
-            <th className={head} style={{ width: '220px' }}>
+            <th className={head} style={{ width: '15%', minWidth: '120px' }}>
               End Date
             </th>
-            <th className={head} style={{ width: '280px' }}>
-              Predecessors
-            </th>
-            <th className={head} style={{ width: '80px' }}>
+            <th className={head} style={{ width: '15%', minWidth: '120px' }}>
               Budget
-            </th>
-            <th className={head} style={{ width: '70px' }}>
-              Actions
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="overflow-auto">
           {tasks.length === 0 && !newRowState.isAdding ? (
             <tr>
-              <td colSpan={8} className="py-8 text-center text-gray-500">
+              <td colSpan={6} className="py-8 text-center text-gray-500">
                 <div className="flex flex-col items-center gap-2">
                   <span>No tasks yet. Click below to add your first task.</span>
                   <button
@@ -502,6 +539,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 const taskNameTextColor = getTaskNameTextColor(task.wbsPath)
                 const borderColor = getBorderColor(task.wbsPath)
                 const formattedWbs = formatWbsCode(task.wbsPath)
+                const budgetRollup = calculateBudgetRollup(task)
                 
                 return (
                   <React.Fragment key={task.id}>
@@ -511,19 +549,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         ${selectedTaskId === task.id ? 'ring-2 ring-sky-500 ring-opacity-50' : ''}
                       `}
                       onClick={() => onSelectTask(task.id)}
+                      onContextMenu={(e) => handleRightClick(e, task.id)}
                     >
                       {/* WBS Path */}
                       <td className={`${cell} rounded-l-md border border-r-0 border-gray-200`}>
                         <div className="flex items-center justify-center gap-1">
                           {/* Level Badge */}
                           <span className={`inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full ${
-                            level === 1 ? 'bg-slate-600 text-white' :
-                            level === 2 ? 'bg-blue-600 text-white' :
-                            level === 3 ? 'bg-green-600 text-white' :
+                            level === 0 ? 'bg-slate-700 text-white' :
+                            level === 1 ? 'bg-blue-600 text-white' :
+                            level === 2 ? 'bg-green-600 text-white' :
+                            level === 3 ? 'bg-purple-600 text-white' :
                             level === 4 ? 'bg-yellow-600 text-white' :
-                            level === 5 ? 'bg-purple-600 text-white' :
-                            level === 6 ? 'bg-pink-600 text-white' :
-                            level === 7 ? 'bg-indigo-600 text-white' :
+                            level === 5 ? 'bg-pink-600 text-white' :
+                            level === 6 ? 'bg-indigo-600 text-white' :
                             'bg-orange-600 text-white'
                           }`}>
                             {level}
@@ -544,7 +583,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             />
                           ) : (
                             <span 
-                              className={`text-xs font-mono cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded ${wbsTextColor}`}
+                              className={`text-sm font-mono cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded ${wbsTextColor}`}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleCellClick(task.id, 'wbsPath', task.wbsPath)
@@ -568,7 +607,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           ))}
                           
                           {/* Level indicator */}
-                          {level > 1 && (
+                          {level > 0 && (
                             <ChevronRight className="w-3 h-3 text-gray-400 mr-1 flex-shrink-0" />
                           )}
                           
@@ -591,7 +630,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 e.stopPropagation()
                                 handleCellClick(task.id, 'name', task.name)
                               }}
-                              className={`flex-1 cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-left text-xs ${getTaskNameTextColor(task.wbsPath)}`}
+                              className={`flex-1 cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-left text-sm ${getTaskNameTextColor(task.wbsPath)}`}
                             >
                               {task.name}
                             </div>
@@ -621,102 +660,126 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               e.stopPropagation()
                               handleCellClick(task.id, 'duration', task.duration)
                             }}
-                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-xs"
+                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm"
                           >
                             {task.duration}d
                           </div>
                         )}
                       </td>
 
-                      {/* Start Date */}
+                      {/* Start Date - Editable */}
                       <td className={`${cell} border border-x-0 border-gray-200`}>
-                        <DatePickerCell
-                          value={task.startDate}
-                          onChange={(date) => {
-                            const endDate = calculateEndDate(date, task.duration)
-                            onUpdateTask(task.id, { startDate: date, endDate })
-                          }}
-                          className="w-full text-center"
-                        />
-                      </td>
-
-                      {/* End Date (read-only) */}
-                      <td className={`${cell} border border-x-0 border-gray-200`}>
-                        <span className="text-gray-500 text-xs">
-                          {new Date(task.endDate).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </td>
-
-                      {/* Predecessors */}
-                      <td className={`${cell} border border-x-0 border-gray-200`}>
-                        <div className="flex justify-center">
-                          <RelationshipSelector
-                            value={task.predecessors}
-                            onChange={(relations) => onUpdateTask(task.id, { predecessors: relations })}
-                            availableTasks={allTasks}
-                            currentTaskId={task.id}
-                            onCircularError={onCircularError}
-                          />
-                        </div>
-                      </td>
-
-                      {/* Budget */}
-                      <td className={`${cell} border border-x-0 border-gray-200`}>
-                        {isEditing(task.id, 'budget') ? (
+                        {isEditing(task.id, 'startDate') ? (
                           <input
-                            type="number"
-                            min="0"
-                            step="100"
+                            type="date"
                             value={editingState.value}
-                            onChange={(e) => handleStartEdit(task.id, 'budget', parseFloat(e.target.value) || 0)}
-                            onBlur={handleSaveEdit}
+                            onChange={(e) => handleStartEdit(task.id, 'startDate', e.target.value)}
+                            onBlur={() => {
+                              // Also update end date when start date changes
+                              const task = tasks.find(t => t.id === editingState.taskId)
+                              if (task) {
+                                const endDate = calculateEndDate(editingState.value, task.duration)
+                                onUpdateTask(editingState.taskId!, { startDate: editingState.value, endDate })
+                              }
+                              handleSaveEdit()
+                            }}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit()
+                              if (e.key === 'Enter') {
+                                const task = tasks.find(t => t.id === editingState.taskId)
+                                if (task) {
+                                  const endDate = calculateEndDate(editingState.value, task.duration)
+                                  onUpdateTask(editingState.taskId!, { startDate: editingState.value, endDate })
+                                }
+                                handleSaveEdit()
+                              }
                               if (e.key === 'Escape') handleCancelEdit()
                             }}
-                            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
+                            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
                             autoFocus
                           />
                         ) : (
                           <div
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleCellClick(task.id, 'budget', task.budget)
+                              handleCellClick(task.id, 'startDate', task.startDate)
                             }}
-                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-xs"
+                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm"
                           >
-                            {formatCurrency(task.budget)}
+                            {formatDate(task.startDate)}
                           </div>
                         )}
                       </td>
 
-                      {/* Actions */}
+                      {/* End Date - Editable */}
+                      <td className={`${cell} border border-x-0 border-gray-200`}>
+                        {isEditing(task.id, 'endDate') ? (
+                          <input
+                            type="date"
+                            value={editingState.value}
+                            onChange={(e) => handleStartEdit(task.id, 'endDate', e.target.value)}
+                            onBlur={handleSaveEdit}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit()
+                              if (e.key === 'Escape') handleCancelEdit()
+                            }}
+                            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
+                            autoFocus
+                          />
+                        ) : (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCellClick(task.id, 'endDate', task.endDate)
+                            }}
+                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm"
+                          >
+                            {formatDate(task.endDate)}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Budget with Rollup */}
                       <td className={`${cell} rounded-r-md border border-l-0 border-gray-200`}>
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleAddRow(task.id)
-                            }}
-                            className="p-1 text-sky-600 hover:bg-sky-100 rounded transition-colors opacity-0 group-hover:opacity-100"
-                            title="Add task after this one"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onDeleteTask(task.id)
-                            }}
-                            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors opacity-0 group-hover:opacity-100"
-                            title="Delete task"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                        <div className="flex flex-col items-center">
+                          {/* Show rollup total for parent tasks */}
+                          {tasks.some(t => t.parentId === task.id) && (
+                            <div className="text-sm font-bold text-green-700">
+                              {formatCurrency(budgetRollup)}
+                            </div>
+                          )}
+                          
+                          {/* Direct budget (editable) */}
+                          {isEditing(task.id, 'budget') ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="1000"
+                              value={editingState.value}
+                              onChange={(e) => handleStartEdit(task.id, 'budget', parseFloat(e.target.value) || 0)}
+                              onBlur={handleSaveEdit}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEdit()
+                                if (e.key === 'Escape') handleCancelEdit()
+                              }}
+                              className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
+                              autoFocus
+                            />
+                          ) : (
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCellClick(task.id, 'budget', task.budget)
+                              }}
+                              className={`cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm ${
+                                tasks.some(t => t.parentId === task.id) ? 'text-gray-500' : 'text-gray-800'
+                              }`}
+                            >
+                              {tasks.some(t => t.parentId === task.id) ? 
+                                `(${formatCurrency(task.budget || 0)})` : 
+                                formatCurrency(task.budget || 0)
+                              }
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -736,6 +799,51 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           )}
         </tbody>
       </table>
+
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-[150px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => handleContextMenuAction('add')}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Task
+          </button>
+          <button
+            onClick={() => handleContextMenuAction('edit')}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Edit2 className="w-4 h-4" />
+            Edit
+          </button>
+          <button
+            onClick={() => handleContextMenuAction('copy')}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Copy className="w-4 h-4" />
+            Copy
+          </button>
+          <button
+            onClick={() => handleContextMenuAction('cut')}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Scissors className="w-4 h-4" />
+            Cut
+          </button>
+          <div className="border-t border-gray-200 my-1"></div>
+          <button
+            onClick={() => handleContextMenuAction('delete')}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 } 

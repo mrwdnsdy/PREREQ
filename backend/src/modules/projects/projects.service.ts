@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { AuthService } from '../auth/auth.service';
+import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class ProjectsService {
@@ -17,6 +18,8 @@ export class ProjectsService {
         ...createProjectDto,
         startDate: new Date(createProjectDto.startDate),
         endDate: new Date(createProjectDto.endDate),
+        budget: createProjectDto.budget ? new Decimal(createProjectDto.budget) : null,
+        budgetRollup: new Decimal(0),
       },
     });
 
@@ -26,6 +29,24 @@ export class ProjectsService {
         userId,
         projectId: project.id,
         role: 'PM',
+      },
+    });
+
+    // Create WBS Level 0 (project root) task
+    await this.prisma.task.create({
+      data: {
+        projectId: project.id,
+        level: 0,
+        wbsCode: '0',
+        title: `${project.name} (Project Root)`,
+        description: 'Project root-level WBS element - all project work rolls up to this level',
+        startDate: project.startDate,
+        endDate: project.endDate,
+        isMilestone: false,
+        costLabor: new Decimal(0),
+        costMaterial: new Decimal(0),
+        costOther: new Decimal(0),
+        totalCost: new Decimal(0),
       },
     });
 
@@ -125,6 +146,9 @@ export class ProjectsService {
         ...updateProjectDto,
         ...(updateProjectDto.startDate && { startDate: new Date(updateProjectDto.startDate) }),
         ...(updateProjectDto.endDate && { endDate: new Date(updateProjectDto.endDate) }),
+        ...(updateProjectDto.budget !== undefined && { 
+          budget: updateProjectDto.budget ? new Decimal(updateProjectDto.budget) : null 
+        }),
       },
     });
 

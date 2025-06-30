@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class PortfolioService {
@@ -138,7 +139,12 @@ export class PortfolioService {
     const totalProjects = userProjects.length;
     const totalTasks = userProjects.reduce((sum, project) => sum + project._count.tasks, 0);
     const totalMilestones = userProjects.reduce((sum, project) => sum + project.tasks.length, 0);
-    const totalBudget = userProjects.reduce((sum, project) => sum + (project.budget || 0), 0);
+    
+    // Handle Decimal budget properly - convert to number for calculation
+    const totalBudget = userProjects.reduce((sum, project) => {
+      const projectBudget = project.budget ? Number(project.budget.toString()) : 0;
+      return sum + projectBudget;
+    }, 0);
 
     // Calculate date ranges
     const allDates = userProjects.flatMap(project => [
@@ -164,7 +170,7 @@ export class PortfolioService {
         client: project.client,
         startDate: project.startDate,
         endDate: project.endDate,
-        budget: project.budget,
+        budget: project.budget ? Number(project.budget.toString()) : 0, // Convert Decimal to number for API response
         taskCount: project._count.tasks,
         milestoneCount: project.tasks.length,
       })),

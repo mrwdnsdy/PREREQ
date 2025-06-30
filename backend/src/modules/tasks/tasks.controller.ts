@@ -51,6 +51,14 @@ export class TasksController {
     return this.tasksService.getMilestones(projectId, req.user.id);
   }
 
+  @Post('project/:projectId/recalculate-budgets')
+  @ApiOperation({ summary: 'Recalculate budget rollups for a project' })
+  @ApiResponse({ status: 200, description: 'Budget rollups recalculated successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  recalculateBudgets(@Param('projectId') projectId: string, @Request() req) {
+    return this.tasksService.recalculateProjectBudgets(projectId, req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific task' })
   @ApiResponse({ status: 200, description: 'Task details' })

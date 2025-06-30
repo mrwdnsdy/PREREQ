@@ -338,7 +338,7 @@ const SchedulePage: React.FC = () => {
       </header>
 
       {/* Content */}
-      <div className="grid grid-cols-[400px_1fr] overflow-hidden max-md:grid-cols-1">
+      <div className="grid grid-cols-[280px_1fr] overflow-hidden max-md:grid-cols-1">
         <aside className="border-r overflow-auto bg-white max-md:hidden min-w-0">
           <WbsTree
             nodes={wbsTree}
@@ -354,14 +354,16 @@ const SchedulePage: React.FC = () => {
           />
         </aside>
 
-        <section className="overflow-auto p-6">
+        <section className="overflow-auto">
           {!tasks || tasks.length === 0 ? (
-            <EmptyState
-              icon={<ClipboardIcon className="h-10 w-10 text-gray-300" />}
-              title="No tasks yet"
-              actionText="+ Add Task"
-              onAction={() => handleAddTask()}
-            />
+            <div className="flex items-center justify-center h-full">
+              <EmptyState
+                icon={<ClipboardIcon className="h-10 w-10 text-gray-300" />}
+                title="No tasks yet"
+                actionText="+ Add Task"
+                onAction={() => handleAddTask()}
+              />
+            </div>
           ) : (
             <TaskTable
               tasks={tasks || []}
