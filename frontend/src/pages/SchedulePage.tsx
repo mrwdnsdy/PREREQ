@@ -338,8 +338,8 @@ const SchedulePage: React.FC = () => {
       </header>
 
       {/* Content */}
-      <div className="grid grid-cols-[280px_1fr] overflow-hidden max-md:grid-cols-1">
-        <aside className="border-r overflow-auto bg-white max-md:hidden min-w-0">
+      <div className="grid grid-cols-[300px_1fr] h-full overflow-hidden">
+        <aside className="border-r overflow-y-auto bg-white">
           <WbsTree
             nodes={wbsTree}
             collapsedNodes={collapsedNodes}
@@ -354,7 +354,7 @@ const SchedulePage: React.FC = () => {
           />
         </aside>
 
-        <section className="overflow-auto">
+        <section className="overflow-auto p-6">
           {!tasks || tasks.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <EmptyState

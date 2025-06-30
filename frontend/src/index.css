@@ -4,11 +4,11 @@
 
 /* Custom responsive grid for schedule layout */
 @media (max-width: 767px) {
-  .grid-cols-\[280px_1fr\] {
+  .grid-cols-\[300px_1fr\] {
     grid-template-columns: 1fr !important;
   }
   
-  .max-md\:hidden {
+  aside {
     display: none !important;
   }
 }

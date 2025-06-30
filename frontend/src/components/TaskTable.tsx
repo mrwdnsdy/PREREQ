@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { Task } from '../hooks/useTasks'
 import { TaskRelation } from '../services/scheduleApi'
 import { DatePickerCell } from './DatePickerCell'
-import { Plus, Trash2, ChevronRight, Edit2, Copy, Scissors } from 'lucide-react'
+import { Plus, Trash2, Edit2, Copy, Scissors } from 'lucide-react'
 
 interface TaskTableProps {
   tasks: Task[]
@@ -71,8 +71,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   })
 
   // Common styling classes
-  const cell = "text-center align-middle py-2 px-2"
-  const head = "sticky top-0 z-10 bg-white text-center text-sm font-semibold text-gray-500 py-3"
+  const cell = "text-center align-middle py-1 px-2"
+  const head = "sticky top-0 z-10 bg-white text-center text-xs font-semibold text-gray-500"
+
+  // Depth calculation for visual nesting
+  const depth = (code: string): number => code.split('.').length - 1
 
   // Enhanced WBS helper functions
   const getWbsLevel = (wbsPath: string): number => {
@@ -490,7 +493,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   return (
     <div className="relative overflow-hidden w-full h-full">
-      <table className="w-full border-separate border-spacing-y-1 text-sm">
+      <table className="min-w-full border-separate border-spacing-y-1 text-sm">
         <thead>
           <tr>
             <th className={head} style={{ width: '10%', minWidth: '100px' }}>
@@ -597,20 +600,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       </td>
 
                       {/* Task Name with Visual Hierarchy */}
-                      <td className={`${cell} border border-x-0 border-gray-200`}>
-                        <div className="flex items-center" style={{ paddingLeft: `${indentLevel * 20}px` }}>
-                          {/* Indentation guides */}
-                          {Array.from({ length: indentLevel }, (_, i) => (
-                            <div key={i} className="w-4 h-4 flex items-center justify-center">
-                              <div className="w-px h-full bg-gray-300"></div>
-                            </div>
-                          ))}
-                          
-                          {/* Level indicator */}
-                          {level > 0 && (
-                            <ChevronRight className="w-3 h-3 text-gray-400 mr-1 flex-shrink-0" />
-                          )}
-                          
+                      <td className={`${cell} ${depth(task.wbsPath) % 2 ? "bg-gray-50" : ""} border border-x-0 border-gray-200`}>
+                        <div className="relative pl-4" style={{ paddingLeft: `${depth(task.wbsPath) * 1.25}rem` }}>
+                          <span className="absolute left-1 top-0 bottom-0 border-l border-dashed border-gray-300" />
                           {isEditing(task.id, 'name') ? (
                             <input
                               type="text"
@@ -621,7 +613,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 if (e.key === 'Enter') handleSaveEdit()
                                 if (e.key === 'Escape') handleCancelEdit()
                               }}
-                              className="flex-1 rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                              className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
                               autoFocus
                             />
                           ) : (
@@ -630,7 +622,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 e.stopPropagation()
                                 handleCellClick(task.id, 'name', task.name)
                               }}
-                              className={`flex-1 cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-left text-sm ${getTaskNameTextColor(task.wbsPath)}`}
+                              className={`cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-center text-sm ${getTaskNameTextColor(task.wbsPath)}`}
                             >
                               {task.name}
                             </div>
