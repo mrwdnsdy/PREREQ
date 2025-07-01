@@ -12,6 +12,26 @@ export class TasksService {
     private authService: AuthService,
   ) {}
 
+  // Generate unique Activity ID
+  private async generateUniqueActivityId(): Promise<string> {
+    // Find the highest existing Activity ID
+    const lastTask = await this.prisma.task.findFirst({
+      select: { activityId: true },
+      orderBy: { activityId: 'desc' },
+    });
+
+    let nextNumber = 1010; // Default starting number
+    if (lastTask?.activityId) {
+      // Extract the number from the Activity ID (e.g., "A1270" -> 1270)
+      const match = lastTask.activityId.match(/^A(\d+)$/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 10;
+      }
+    }
+
+    return `A${nextNumber}`;
+  }
+
   private calculateLevel(parentId: string | null, projectId: string): Promise<number> {
     // Level 0 is allowed for project root tasks (no parent)
     if (!parentId) return Promise.resolve(0);
@@ -146,8 +166,10 @@ export class TasksService {
       });
 
       if (project) {
+        const activityId = await this.generateUniqueActivityId();
         await this.prisma.task.create({
           data: {
+            activityId,
             projectId: projectId,
             level: 0,
             wbsCode: '0',
@@ -195,6 +217,9 @@ export class TasksService {
       }
     }
 
+    // Generate unique Activity ID
+    const activityId = await this.generateUniqueActivityId();
+
     // Calculate direct cost
     const directCost = this.calculateDirectCost(
       createTaskDto.costLabor || 0,
@@ -205,6 +230,7 @@ export class TasksService {
     const task = await this.prisma.task.create({
       data: {
         ...createTaskDto,
+        activityId,
         level,
         startDate: new Date(createTaskDto.startDate),
         endDate: new Date(createTaskDto.endDate),

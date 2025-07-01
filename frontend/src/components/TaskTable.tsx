@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { Task } from '../hooks/useTasks'
 import { TaskRelation } from '../services/scheduleApi'
 import { DatePickerCell } from './DatePickerCell'
@@ -44,6 +44,21 @@ interface LagInputProps {
   onChange: (value: number) => void
 }
 
+interface BudgetCellProps {
+  value: number
+  onChange: (value: number) => void
+  rollupValue: number
+  isRollup: boolean
+}
+
+interface BudgetMismatch {
+  taskId: string
+  taskName: string
+  currentBudget: number
+  rollupBudget: number
+  difference: number
+}
+
 const LagInput: React.FC<LagInputProps> = ({ value, onChange }) => {
   const [editing, setEditing] = useState(false)
   const [inputValue, setInputValue] = useState(value.toString())
@@ -87,6 +102,95 @@ const LagInput: React.FC<LagInputProps> = ({ value, onChange }) => {
   )
 }
 
+const BudgetCell: React.FC<BudgetCellProps> = ({ value, onChange, rollupValue, isRollup }) => {
+  const [isEditing, setIsEditing] = useState(false)
+  const [tempValue, setTempValue] = useState(value)
+  const [showMismatchWarning, setShowMismatchWarning] = useState(false)
+
+  const hasMismatch = !isRollup && Math.abs(value - rollupValue) > 0.01
+
+  useEffect(() => {
+    setTempValue(value)
+  }, [value])
+
+  const handleSave = () => {
+    onChange(tempValue)
+    setIsEditing(false)
+    
+    // Check for mismatches after save
+    if (Math.abs(tempValue - rollupValue) > 0.01) {
+      setShowMismatchWarning(true)
+      setTimeout(() => setShowMismatchWarning(false), 3000)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave()
+    } else if (e.key === 'Escape') {
+      setTempValue(value)
+      setIsEditing(false)
+    }
+  }
+
+  if (isRollup) {
+    return (
+      <span className="text-gray-600 text-xs font-medium">
+        {new Intl.NumberFormat('en-US', { 
+          style: 'currency', 
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(rollupValue)}
+      </span>
+    )
+  }
+
+  return (
+    <div className="relative">
+      {isEditing ? (
+        <input
+          type="number"
+          step="1000"
+          min="0"
+          value={tempValue}
+          onChange={(e) => setTempValue(parseFloat(e.target.value) || 0)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="w-full px-1 py-0.5 text-xs border rounded text-center"
+          autoFocus
+        />
+      ) : (
+        <div className="relative">
+          <span 
+            onClick={() => setIsEditing(true)}
+            className={`cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded text-xs ${
+              hasMismatch ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : ''
+            }`}
+            title={hasMismatch ? `Mismatch! Rollup: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(rollupValue)}` : ''}
+          >
+            {new Intl.NumberFormat('en-US', { 
+              style: 'currency', 
+              currency: 'USD',
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            }).format(value)}
+          </span>
+          {hasMismatch && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" title="Budget mismatch!" />
+          )}
+        </div>
+      )}
+      
+      {showMismatchWarning && (
+        <div className="absolute top-full left-0 z-10 bg-yellow-100 border border-yellow-300 text-yellow-800 text-xs p-2 rounded shadow-lg whitespace-nowrap">
+          ⚠️ Budget mismatch detected! Consider rebalancing resource loading.
+        </div>
+      )}
+    </div>
+  )
+}
+
 export const TaskTable: React.FC<TaskTableProps> = ({
   tasks,
   allTasks,
@@ -123,8 +227,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set())
 
   // Common styling classes
-  const cell = "text-center align-middle py-1 px-2"
-  const head = "sticky top-0 z-10 bg-white text-center text-xs font-semibold text-gray-500"
+  const cell = "text-center align-middle py-1 px-1"
+  const head = "sticky top-0 z-10 bg-white text-center text-xs font-semibold text-gray-500 py-2"
 
   // Depth calculation for visual nesting
   const depth = (code: string): number => code.split('.').length - 1
@@ -229,16 +333,175 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const calculateBudgetRollup = (task: Task): number => {
     const childTasks = tasks.filter(t => t.parentId === task.id)
     if (childTasks.length === 0) {
-      // Leaf task - return its direct budget
-      return task.budget || 0
+      // Leaf task (L4+) - calculate from resource loading
+      return calculateResourceBudget(task)
     } else {
       // Parent task - sum children budgets
       return childTasks.reduce((sum, child) => sum + calculateBudgetRollup(child), 0)
     }
   }
 
+  // Calculate budget from resource loading (for L4+ tasks)
+  const calculateResourceBudget = (task: Task): number => {
+    if (!task.resourceRole || !task.resourceQty || !task.duration) {
+      return task.totalCost || 0
+    }
+    
+    // Example hourly rates by role (could be from a lookup table)
+    const hourlyRates: { [key: string]: number } = {
+      'Developer': 150,
+      'Designer': 120,
+      'PM': 180,
+      'QA': 100,
+      'Architect': 200,
+      'default': 125
+    }
+    
+    const rate = hourlyRates[task.resourceRole] || hourlyRates['default']
+    const hoursPerDay = 8
+    const totalHours = task.duration * hoursPerDay * (task.resourceQty || 1)
+    
+    return totalHours * rate
+  }
+
+  // Check if task can have budget edited (L0-L3 only, not L4+)
+  const canEditBudget = (task: Task): boolean => {
+    const level = getWbsLevel(task.wbsPath || task.wbsCode || '')
+    return level < 4 // L0, L1, L2, L3 can be edited
+  }
+
+  // Check if task can have resource loading edited (L4-L10 only)
+  const canEditResourceLoading = (task: Task): boolean => {
+    const level = getWbsLevel(task.wbsPath || task.wbsCode || '')
+    return level >= 4 && level <= 10 // L4 through L10 can have resource loading
+  }
+
+  // Handle budget changes with validation and rollup logic
+  const handleBudgetChange = (taskId: string, newBudget: number) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || !canEditBudget(task)) return
+
+    // Update the task budget
+    onUpdateTask(taskId, { totalCost: newBudget })
+
+    // Check for mismatches with resource loading in children
+    const mismatches = detectBudgetMismatches(taskId, newBudget)
+    if (mismatches.length > 0) {
+      promptUserForResourceAdjustment(mismatches)
+    }
+  }
+
+  // Detect budget mismatches between parent budgets and resource loading
+  const detectBudgetMismatches = (parentTaskId: string, parentBudget: number): BudgetMismatch[] => {
+    const parentTask = tasks.find(t => t.id === parentTaskId)
+    if (!parentTask) return []
+
+    const descendants = getAllDescendants(parentTask.id)
+    const leafTasks = descendants.filter(t => getWbsLevel(t.wbsPath || t.wbsCode || '') >= 4)
+    
+    if (leafTasks.length === 0) return []
+
+    const totalResourceBudget = leafTasks.reduce((sum, task) => sum + calculateResourceBudget(task), 0)
+    const difference = Math.abs(parentBudget - totalResourceBudget)
+    
+    if (difference > 0.01) {
+      return [{
+        taskId: parentTaskId,
+        taskName: parentTask.title || parentTask.name || '',
+        currentBudget: parentBudget,
+        rollupBudget: totalResourceBudget,
+        difference
+      }]
+    }
+
+    return []
+  }
+
+  // Get all descendant tasks
+  const getAllDescendants = (taskId: string): Task[] => {
+    const children = tasks.filter(t => t.parentId === taskId)
+    const allDescendants = [...children]
+    
+    children.forEach(child => {
+      allDescendants.push(...getAllDescendants(child.id))
+    })
+    
+    return allDescendants
+  }
+
+  // Prompt user for resource adjustment with rounding
+  const promptUserForResourceAdjustment = (mismatches: BudgetMismatch[]) => {
+    const mismatch = mismatches[0] // Handle first mismatch
+    const adjustmentNeeded = mismatch.currentBudget - mismatch.rollupBudget
+    
+    if (Math.abs(adjustmentNeeded) < 0.01) return
+
+    const shouldAdjust = window.confirm(
+      `Budget mismatch detected!\n\n` +
+      `Task: ${mismatch.taskName}\n` +
+      `Current Budget: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(mismatch.currentBudget)}\n` +
+      `Resource Loading Total: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(mismatch.rollupBudget)}\n` +
+      `Difference: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(mismatch.difference)}\n\n` +
+      `Would you like to automatically adjust resource loading to match the budget?`
+    )
+
+    if (shouldAdjust) {
+      adjustResourceLoadingToMatchBudget(mismatch.taskId, mismatch.currentBudget)
+    }
+  }
+
+  // Adjust resource loading to match budget using 0.25h rounding
+  const adjustResourceLoadingToMatchBudget = (parentTaskId: string, targetBudget: number) => {
+    const parentTask = tasks.find(t => t.id === parentTaskId)
+    if (!parentTask) return
+
+    const descendants = getAllDescendants(parentTask.id)
+    const leafTasks = descendants.filter(t => 
+      getWbsLevel(t.wbsPath || t.wbsCode || '') >= 4 && 
+      t.resourceRole && t.resourceQty && t.duration
+    )
+
+    if (leafTasks.length === 0) return
+
+    const totalCurrentBudget = leafTasks.reduce((sum, task) => sum + calculateResourceBudget(task), 0)
+    if (totalCurrentBudget === 0) return
+
+    const scaleFactor = targetBudget / totalCurrentBudget
+
+    leafTasks.forEach(task => {
+      const currentResourceBudget = calculateResourceBudget(task)
+      const targetResourceBudget = currentResourceBudget * scaleFactor
+      
+      // Calculate new quantity needed
+      const hourlyRate = getHourlyRate(task.resourceRole || 'default')
+      const hoursPerDay = 8
+      const totalHoursNeeded = targetResourceBudget / hourlyRate
+      const newQuantity = totalHoursNeeded / (task.duration * hoursPerDay)
+      
+      // Round to nearest 0.25
+      const roundedQuantity = Math.round(newQuantity * 4) / 4
+      
+      if (roundedQuantity > 0 && roundedQuantity !== task.resourceQty) {
+        onUpdateTask(task.id, { resourceQty: roundedQuantity })
+      }
+    })
+  }
+
+  // Get hourly rate for a role
+  const getHourlyRate = (role: string): number => {
+    const hourlyRates: { [key: string]: number } = {
+      'Developer': 150,
+      'Designer': 120,
+      'PM': 180,
+      'QA': 100,
+      'Architect': 200,
+      'default': 125
+    }
+    return hourlyRates[role] || hourlyRates['default']
+  }
+
   // Helper function to generate next WBS code
-  const generateNextWbsCode = (afterTaskId?: string) => {
+  const generateNextWbsCode = (afterTaskId?: string, isChild: boolean = false) => {
     if (!afterTaskId) {
       // Adding at the end, find the highest root level
       const rootTasks = tasks.filter(t => getWbsLevel(t.wbsPath) === 1)
@@ -250,17 +513,34 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     if (!afterTask) return '1'
 
     const afterWbs = afterTask.wbsPath
-    const parts = afterWbs.split('.')
     
-    // If it's a root level task, increment the last number
-    if (parts.length === 1) {
-      return `${parseInt(parts[0]) + 1}`
+    if (isChild) {
+      // Adding a child: append .1 to parent's WBS
+      const children = tasks.filter(t => t.parentId === afterTaskId)
+      if (children.length === 0) {
+        return `${afterWbs}.1`
+      } else {
+        // Find the highest child number
+        const maxChild = Math.max(0, ...children.map(child => {
+          const childParts = child.wbsPath.split('.')
+          return parseInt(childParts[childParts.length - 1]) || 0
+        }))
+        return `${afterWbs}.${maxChild + 1}`
+      }
+    } else {
+      // Adding a sibling: increment the last part
+      const parts = afterWbs.split('.')
+      
+      // If it's a root level task, increment the last number
+      if (parts.length === 1) {
+        return `${parseInt(parts[0]) + 1}`
+      }
+      
+      // For child tasks, increment the last part
+      const lastPart = parseInt(parts[parts.length - 1])
+      parts[parts.length - 1] = `${lastPart + 1}`
+      return parts.join('.')
     }
-    
-    // For child tasks, increment the last part
-    const lastPart = parseInt(parts[parts.length - 1])
-    parts[parts.length - 1] = `${lastPart + 1}`
-    return parts.join('.')
   }
 
   const handleStartEdit = useCallback((taskId: string, field: string, value: any) => {
@@ -296,7 +576,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   }
 
   const handleAddRow = (afterTaskId?: string) => {
-    const wbsPath = generateNextWbsCode(afterTaskId)
+    const wbsPath = generateNextWbsCode(afterTaskId, false)
     setNewRowState({
       isAdding: true,
       afterTaskId,
@@ -308,8 +588,24 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     })
   }
 
+  const handleAddChild = (parentTaskId: string) => {
+    const wbsPath = generateNextWbsCode(parentTaskId, true)
+    setNewRowState({
+      isAdding: true,
+      afterTaskId: parentTaskId,
+      wbsPath,
+      name: '',
+      duration: 1,
+      startDate: new Date().toISOString().split('T')[0],
+      budget: 0
+    })
+  }
+
   const handleSaveNewRow = async () => {
     try {
+      // Determine if this is a child task based on WBS path
+      const isChildTask = newRowState.wbsPath.includes('.') && newRowState.afterTaskId
+      
       const newTask: Partial<Task> = {
         wbsPath: newRowState.wbsPath,
         name: newRowState.name || 'New Task',
@@ -319,6 +615,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         budget: newRowState.budget,
         isMilestone: false,
         predecessors: []
+      }
+
+      // Set parent relationship for child tasks
+      if (isChildTask && newRowState.afterTaskId) {
+        newTask.parentId = newRowState.afterTaskId
       }
 
       await onAddTask(newTask)
@@ -377,8 +678,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return endDate.toISOString().split('T')[0]
   }
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
+  const formatDate = (dateInput: string | Date): string => {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
     return date.toLocaleDateString('en-US', {
       month: '2-digit',
       day: '2-digit',
@@ -408,7 +709,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     if (contextMenu.taskId) {
       switch (action) {
         case 'add':
-          handleAddRow(contextMenu.taskId)
+          handleAddChild(contextMenu.taskId)
           break
         case 'edit':
           const task = tasks.find(t => t.id === contextMenu.taskId)
@@ -446,92 +747,178 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
     return (
       <tr className="bg-sky-50 border-l-4 border-sky-400">
-        {/* WBS Path */}
-        <td className={`${cell} rounded-l-md border border-r-0 border-gray-200`}>
-          <input
-            type="text"
-            value={newRowState.wbsPath}
-            onChange={(e) => setNewRowState(prev => ({ ...prev, wbsPath: e.target.value }))}
-            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs font-mono"
-            placeholder="WBS"
-          />
+        {/* Task Name with WBS */}
+        <td className="py-1 px-2 text-left">
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              value={newRowState.wbsPath}
+              onChange={(e) => setNewRowState(prev => ({ ...prev, wbsPath: e.target.value }))}
+              className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-xs font-mono"
+              placeholder="WBS Code"
+            />
+            <input
+              type="text"
+              value={newRowState.name}
+              onChange={(e) => setNewRowState(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              placeholder="Task name"
+              autoFocus
+            />
+          </div>
         </td>
 
-        {/* Task Name */}
-        <td className={`${cell} border border-x-0 border-gray-200`}>
-          <input
-            type="text"
-            value={newRowState.name}
-            onChange={(e) => setNewRowState(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-            placeholder="Task name"
-            autoFocus
-          />
-        </td>
-
-        {/* Duration */}
-        <td className={`${cell} border border-x-0 border-gray-200`}>
-          <input
-            type="number"
-            min="1"
-            value={newRowState.duration}
-            onChange={(e) => setNewRowState(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
-            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
-          />
-        </td>
-
-        {/* Start Date */}
-        <td className={`${cell} border border-x-0 border-gray-200`}>
-          <input
-            type="date"
-            value={newRowState.startDate}
-            onChange={(e) => setNewRowState(prev => ({ ...prev, startDate: e.target.value }))}
-            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
-          />
-        </td>
-
-        {/* End Date (calculated) */}
-        <td className={`${cell} border border-x-0 border-gray-200`}>
-          <span className="text-gray-500 text-xs">
-            {formatDate(calculateEndDate(newRowState.startDate, newRowState.duration))}
+        {/* Activity ID - will be auto-generated */}
+        <td className={cell}>
+          <span className="text-xs font-mono text-gray-500 bg-gray-50 px-2 py-1 rounded">
+            Auto-generated
           </span>
         </td>
 
-        {/* Budget */}
-        <td className={`${cell} rounded-r-md border border-l-0 border-gray-200`}>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="0"
-              step="1000"
-              value={newRowState.budget}
-              onChange={(e) => setNewRowState(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
-              className="flex-1 rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
-              placeholder="0"
-            />
-            <button
-              onClick={handleSaveNewRow}
-              className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
-              title="Save"
-            >
-              ✓
-            </button>
-            <button
-              onClick={handleCancelNewRow}
-              className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-              title="Cancel"
-            >
-              ✕
-            </button>
-          </div>
-        </td>
+        {view === 'schedule' ? (
+          <>
+            {/* Type */}
+            <td className={cell}>
+              <span className="text-gray-600 text-xs">Task</span>
+            </td>
+
+            {/* Budget */}
+            <td className={cell}>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={newRowState.budget}
+                onChange={(e) => setNewRowState(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
+                className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
+                placeholder="0"
+              />
+            </td>
+
+            {/* Duration */}
+            <td className={cell}>
+              <input
+                type="number"
+                min="1"
+                value={newRowState.duration}
+                onChange={(e) => setNewRowState(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
+                className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
+              />
+            </td>
+
+            {/* Start Date */}
+            <td className={cell}>
+              <input
+                type="date"
+                value={newRowState.startDate}
+                onChange={(e) => setNewRowState(prev => ({ ...prev, startDate: e.target.value }))}
+                className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
+              />
+            </td>
+
+            {/* End Date (calculated) */}
+            <td className={cell}>
+              <span className="text-gray-500 text-xs">
+                {formatDate(calculateEndDate(newRowState.startDate, newRowState.duration))}
+              </span>
+            </td>
+
+            {/* Progress % with Save/Cancel */}
+            <td className={cell}>
+              <div className="flex items-center gap-1 justify-center">
+                <span className="text-xs">0%</span>
+                <button
+                  onClick={handleSaveNewRow}
+                  className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                  title="Save"
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={handleCancelNewRow}
+                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                  title="Cancel"
+                >
+                  ✕
+                </button>
+              </div>
+            </td>
+          </>
+        ) : (
+          <>
+            {/* Budget */}
+            <td className={cell}>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={newRowState.budget}
+                onChange={(e) => setNewRowState(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
+                className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
+                placeholder="0"
+              />
+            </td>
+
+            {/* Role1 */}
+            <td className={cell}>
+              {getWbsLevel(newRowState.wbsPath) >= 4 ? (
+                <input
+                  type="text"
+                  placeholder="Role"
+                  className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-xs"
+                />
+              ) : (
+                <span className="text-gray-400 text-xs">-</span>
+              )}
+            </td>
+
+            {/* Role2 */}
+            <td className={cell}>
+              {getWbsLevel(newRowState.wbsPath) >= 4 ? (
+                <input
+                  type="text"
+                  placeholder="Role 2"
+                  className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-xs"
+                />
+              ) : (
+                <span className="text-gray-400 text-xs">-</span>
+              )}
+            </td>
+
+            {/* Predecessors */}
+            <td className={cell}>
+              <span className="text-gray-500 text-xs">-</span>
+            </td>
+
+            {/* Lag with Save/Cancel */}
+            <td className={cell}>
+              <div className="flex items-center gap-1 justify-center">
+                <span className="text-xs">0d</span>
+                <button
+                  onClick={handleSaveNewRow}
+                  className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                  title="Save"
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={handleCancelNewRow}
+                  className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                  title="Cancel"
+                >
+                  ✕
+                </button>
+              </div>
+            </td>
+          </>
+        )}
       </tr>
     )
   }
 
   const renderAddButton = (afterTaskId?: string) => (
     <tr className="group">
-      <td colSpan={6} className="py-1">
+      <td colSpan={view === 'schedule' ? 8 : 7} className="py-1">
         <button
           onClick={() => handleAddRow(afterTaskId)}
           className="w-full py-1 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1"
@@ -551,11 +938,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   // Calculate finish date based on predecessors
   const calcFinish = (task: Task): Date => {
     if (!isDriven(task)) {
-      return task.endDate
+      return new Date(task.endDate)
     }
     
     // Find the latest predecessor finish + lag
-    let latestFinish = task.startDate
+    let latestFinish = new Date(task.startDate)
     if (task.predecessors) {
       for (const pred of task.predecessors) {
         const predTask = tasks.find(t => t.id === pred.predecessorId)
@@ -614,15 +1001,39 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   return (
     <div className="relative overflow-auto w-full">
-      <table className="min-w-full border-separate border-spacing-y-1 text-sm">
+      <table className="min-w-full border-separate border-spacing-y-1 text-sm table-fixed">
+        <colgroup>
+          <col style={{ width: '22%' }} />
+          <col style={{ width: '6%' }} />
+          {view === 'schedule' ? (
+            <>
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '7.5%' }} />
+              <col style={{ width: '7.5%' }} />
+              <col style={{ width: '7%' }} />
+            </>
+          ) : (
+            <>
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+            </>
+          )}
+        </colgroup>
         <thead>
           <tr>
-            <th className={head} style={{ textAlign: 'left', paddingLeft: '8px' }}>
+            <th className={`${head} text-left`} style={{ paddingLeft: '8px' }}>
               Task
             </th>
+            <th className={head}>Activity ID</th>
             {view === 'schedule' ? (
               <>
                 <th className={head}>Type</th>
+                <th className={head}>Budget</th>
                 <th className={head}>Duration</th>
                 <th className={head}>Start</th>
                 <th className={head}>Finish</th>
@@ -649,9 +1060,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             return (
               <tr
                 key={task.id}
-                className={`hover:bg-gray-50 transition-colors ${
-                  selectedTaskId === task.id ? 'bg-blue-50' : ''
-                } ${taskDepth % 2 === 1 ? 'bg-gray-25' : ''}`}
+                className={`transition-colors ${getRowBackgroundColor(task.wbsPath || task.wbsCode || '')} ${getBorderColor(task.wbsPath || task.wbsCode || '')} ${
+                  selectedTaskId === task.id ? 'ring-2 ring-blue-400' : ''
+                } hover:shadow-md transform hover:scale-[1.01] wbs-row border-l-4`}
                 onContextMenu={(e) => handleRightClick(e, task.id)}
                 onClick={() => onSelectTask?.(task.id)}
               >
@@ -672,10 +1083,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         }}
                       />
                     )}
-                    <span className="text-xs text-gray-400 font-mono">
+                    <span className={`text-xs font-mono wbs-code ${getWbsTextColor(task.wbsPath || task.wbsCode || '')}`}>
                       {task.wbsPath || task.wbsCode || ''}
                     </span>
-                    <span className="truncate font-medium">
+                    <span className={`truncate ${getTaskNameTextColor(task.wbsPath || task.wbsCode || '')}`}>
                       {editingState.taskId === task.id && editingState.field === 'name' ? (
                         <input
                           type="text"
@@ -705,22 +1116,58 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   </div>
                 </td>
 
+                {/* Activity ID - uneditable */}
+                <td className={cell}>
+                  <span className="text-xs font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                    {task.activityId}
+                  </span>
+                </td>
+
                 {view === 'schedule' ? (
                   <>
                     {/* Type */}
                     <td className={cell}>
-                      {task.isMilestone ? 'Milestone' : 'Task'}
+                      {task.isMilestone ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          ◆ Milestone
+                        </span>
+                      ) : (
+                        <span className="text-gray-600">Task</span>
+                      )}
+                    </td>
+                    
+                    {/* Budget */}
+                    <td className={cell}>
+                      {canEditBudget(task) ? (
+                        <BudgetCell
+                          value={task.totalCost || 0}
+                          onChange={(value) => handleBudgetChange(task.id, value)}
+                          rollupValue={calculateBudgetRollup(task)}
+                          isRollup={!canEditBudget(task)}
+                        />
+                      ) : (
+                        <span className="text-gray-600 text-xs">
+                          {formatCurrency(calculateBudgetRollup(task))}
+                        </span>
+                      )}
                     </td>
                     
                     {/* Duration */}
                     <td className={cell}>
-                      {task.duration}d
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                        task.duration <= 1 ? 'bg-green-100 text-green-800' :
+                        task.duration <= 5 ? 'bg-blue-100 text-blue-800' :
+                        task.duration <= 10 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {task.duration}d
+                      </span>
                     </td>
                     
                     {/* Start Date */}
                     <td className={cell}>
                       <DatePickerCell
-                        date={task.startDate}
+                        value={task.startDate}
                         onChange={(date) => onUpdateTask(task.id, { startDate: date })}
                       />
                     </td>
@@ -728,12 +1175,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     {/* Finish Date */}
                     <td className={cell}>
                       {driven ? (
-                        <span className="text-gray-600">
+                        <span className="text-gray-600 text-xs">
                           {formatDate(calcFinish(task))}
                         </span>
                       ) : (
                         <DatePickerCell
-                          date={task.endDate}
+                          value={task.endDate}
                           onChange={(date) => onUpdateTask(task.id, { endDate: date })}
                         />
                       )}
@@ -741,17 +1188,31 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     
                     {/* Progress % */}
                     <td className={cell}>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={task.progress || 0}
-                        onChange={(e) =>
-                          onUpdateTask(task.id, { progress: parseInt(e.target.value) || 0 })
-                        }
-                        className="w-16 px-1 py-0.5 text-xs border rounded text-center"
-                      />
-                      %
+                      <div className="flex items-center gap-1 justify-center">
+                        <div className="w-8 bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              (task.progress || 0) === 100 ? 'bg-green-500' :
+                              (task.progress || 0) >= 75 ? 'bg-blue-500' :
+                              (task.progress || 0) >= 50 ? 'bg-yellow-500' :
+                              (task.progress || 0) >= 25 ? 'bg-orange-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${task.progress || 0}%` }}
+                          />
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={task.progress || 0}
+                          onChange={(e) =>
+                            onUpdateTask(task.id, { progress: parseInt(e.target.value) || 0 })
+                          }
+                          className="w-8 px-0.5 py-0.5 text-xs border rounded text-center"
+                        />
+                        <span className="text-xs text-gray-500">%</span>
+                      </div>
                     </td>
                   </>
                 ) : (
@@ -763,28 +1224,36 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     
                     {/* Role1 */}
                     <td className={cell}>
-                      <input
-                        type="text"
-                        value={task.resourceRole || ''}
-                        onChange={(e) =>
-                          onUpdateTask(task.id, { resourceRole: e.target.value })
-                        }
-                        className="w-full px-1 py-0.5 text-xs border rounded"
-                        placeholder="Role"
-                      />
+                      {canEditResourceLoading(task) ? (
+                        <input
+                          type="text"
+                          value={task.resourceRole || ''}
+                          onChange={(e) =>
+                            onUpdateTask(task.id, { resourceRole: e.target.value })
+                          }
+                          className="w-full px-1 py-0.5 text-xs border rounded"
+                          placeholder="Role"
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
                     </td>
                     
                     {/* Role2 */}
                     <td className={cell}>
-                      <input
-                        type="text"
-                        value={task.resourceRole2 || ''}
-                        onChange={(e) =>
-                          onUpdateTask(task.id, { resourceRole2: e.target.value })
-                        }
-                        className="w-full px-1 py-0.5 text-xs border rounded"
-                        placeholder="Role 2"
-                      />
+                      {canEditResourceLoading(task) ? (
+                        <input
+                          type="text"
+                          value={task.resourceRole2 || ''}
+                          onChange={(e) =>
+                            onUpdateTask(task.id, { resourceRole2: e.target.value })
+                          }
+                          className="w-full px-1 py-0.5 text-xs border rounded"
+                          placeholder="Role 2"
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
                     </td>
                     
                     {/* Predecessors */}

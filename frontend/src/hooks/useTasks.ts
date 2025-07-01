@@ -5,6 +5,7 @@ import api from '../services/api'
 // Backend task structure (what comes from API)
 interface BackendTask {
   id: string
+  activityId: string
   title: string
   wbsCode: string
   startDate: string
@@ -50,7 +51,9 @@ interface BackendTask {
 // Frontend task structure (what TaskTable expects)
 export interface Task {
   id: string
+  activityId: string
   name: string
+  title?: string // For backwards compatibility
   wbsPath: string
   wbsCode: string
   duration: number
@@ -68,10 +71,18 @@ export interface Task {
     }
   }>
   budget: number
+  totalCost?: number // For budget rollup calculations
   percentComplete: number
+  progress?: number // For progress tracking
   isMilestone: boolean
   level: number
   parentId?: string
+  // Resource fields
+  resourceRole?: string
+  resourceQty?: number
+  resourceRole2?: string
+  // Task-level lag for relationships
+  lag?: number
 }
 
 // Transform backend task to frontend task
@@ -87,7 +98,9 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
   
   return {
     id: backendTask.id,
+    activityId: backendTask.activityId,
     name: backendTask.title,
+    title: backendTask.title, // For backwards compatibility
     wbsPath: backendTask.wbsCode,
     wbsCode: backendTask.wbsCode,
     duration,
@@ -102,10 +115,18 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
       }
     })),
     budget: (isNaN(costLabor) ? 0 : costLabor) + (isNaN(costMaterial) ? 0 : costMaterial) + (isNaN(costOther) ? 0 : costOther),
+    totalCost: (isNaN(costLabor) ? 0 : costLabor) + (isNaN(costMaterial) ? 0 : costMaterial) + (isNaN(costOther) ? 0 : costOther),
     percentComplete: 0, // This field doesn't exist in backend yet
+    progress: 0, // For progress tracking
     isMilestone: backendTask.isMilestone,
     level: backendTask.level,
-    parentId: backendTask.parentId
+    parentId: backendTask.parentId,
+    // Resource fields
+    resourceRole: backendTask.resourceRole,
+    resourceQty: backendTask.resourceQty,
+    resourceRole2: '', // Not in backend yet
+    // Task-level lag (could be derived from relationships)
+    lag: 0
   }
 }
 
@@ -135,14 +156,22 @@ export const useTasks = (projectId: string) => {
       const backendUpdates: any = {}
       
       if (updates.name !== undefined) backendUpdates.title = updates.name
+      if (updates.title !== undefined) backendUpdates.title = updates.title
       if (updates.wbsPath !== undefined) backendUpdates.wbsCode = updates.wbsPath
       if (updates.wbsCode !== undefined) backendUpdates.wbsCode = updates.wbsCode
       if (updates.startDate !== undefined) backendUpdates.startDate = updates.startDate
       if (updates.endDate !== undefined) backendUpdates.endDate = updates.endDate
       if (updates.isMilestone !== undefined) backendUpdates.isMilestone = updates.isMilestone
       if (updates.budget !== undefined) backendUpdates.costLabor = updates.budget
+      if (updates.totalCost !== undefined) backendUpdates.costLabor = updates.totalCost
       if (updates.level !== undefined) backendUpdates.level = updates.level
       if (updates.parentId !== undefined) backendUpdates.parentId = updates.parentId
+      if (updates.resourceRole !== undefined) backendUpdates.resourceRole = updates.resourceRole
+      if (updates.resourceQty !== undefined) backendUpdates.resourceQty = updates.resourceQty
+      if (updates.progress !== undefined) {
+        // Handle progress updates (may need to store in a different field or calculate)
+        console.log('Progress update not yet implemented in backend:', updates.progress)
+      }
       
       console.log('useTasks: Backend updates:', backendUpdates)
       return api.patch(`/tasks/${taskId}`, backendUpdates)

@@ -35,6 +35,26 @@ export class P6ImportService {
     private authService: AuthService,
   ) {}
 
+  // Generate unique Activity ID
+  private async generateUniqueActivityId(): Promise<string> {
+    // Find the highest existing Activity ID
+    const lastTask = await this.prisma.task.findFirst({
+      select: { activityId: true },
+      orderBy: { activityId: 'desc' },
+    });
+
+    let nextNumber = 1010; // Default starting number
+    if (lastTask?.activityId) {
+      // Extract the number from the Activity ID (e.g., "A1270" -> 1270)
+      const match = lastTask.activityId.match(/^A(\d+)$/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 10;
+      }
+    }
+
+    return `A${nextNumber}`;
+  }
+
   async importXERFile(fileBuffer: Buffer, projectId: string, userId: string) {
     // Check project access
     const hasAccess = await this.authService.hasProjectAccess(userId, projectId, 'PM');
@@ -202,8 +222,10 @@ export class P6ImportService {
 
     // First pass: create all tasks
     for (const p6Task of p6Tasks) {
+      const activityId = await this.generateUniqueActivityId();
       const task = await this.prisma.task.create({
         data: {
+          activityId,
           projectId,
           wbsCode: p6Task.wbs_id || p6Task.task_id,
           title: p6Task.task_name,

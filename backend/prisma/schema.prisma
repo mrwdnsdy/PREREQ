@@ -40,6 +40,7 @@ model Project {
 
 model Task {
   id           String    @id @default(cuid())
+  activityId   String    @unique @map("activity_id") // Unique Activity ID like A1010, A1020, etc.
   projectId    String    @map("project_id")
   parentId     String?   @map("parent_id")
   level        Int       @default(0) // Level 0 = Project root, Level 1+ = work packages

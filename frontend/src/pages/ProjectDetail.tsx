@@ -177,6 +177,7 @@ const ProjectDetail = () => {
               selectedTaskId={null}
               onSelectTask={() => {}}
               onCircularError={handleCircularError}
+              view="details"
             />
           )}
         </div>

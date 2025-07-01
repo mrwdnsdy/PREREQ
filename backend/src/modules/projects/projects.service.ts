@@ -12,6 +12,26 @@ export class ProjectsService {
     private authService: AuthService,
   ) {}
 
+  // Generate unique Activity ID
+  private async generateUniqueActivityId(): Promise<string> {
+    // Find the highest existing Activity ID
+    const lastTask = await this.prisma.task.findFirst({
+      select: { activityId: true },
+      orderBy: { activityId: 'desc' },
+    });
+
+    let nextNumber = 1010; // Default starting number
+    if (lastTask?.activityId) {
+      // Extract the number from the Activity ID (e.g., "A1270" -> 1270)
+      const match = lastTask.activityId.match(/^A(\d+)$/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 10;
+      }
+    }
+
+    return `A${nextNumber}`;
+  }
+
   async create(createProjectDto: CreateProjectDto, userId: string) {
     const project = await this.prisma.project.create({
       data: {
@@ -33,8 +53,10 @@ export class ProjectsService {
     });
 
     // Create WBS Level 0 (project root) task
+    const activityId = await this.generateUniqueActivityId();
     await this.prisma.task.create({
       data: {
+        activityId,
         projectId: project.id,
         level: 0,
         wbsCode: '0',

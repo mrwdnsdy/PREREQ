@@ -74,17 +74,14 @@ const SchedulePage: React.FC = () => {
       const newTask: Partial<Task> = {
         title: 'New Task',
         wbsCode: newWbsCode,
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-        projectId,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
         parentId: parentId || null,
         duration: 7,
         isMilestone: false,
         budget: 0,
-        description: '',
         resourceRole: '',
-        resourceQty: 1,
-        resourceUnit: 'days'
+        resourceQty: 1
       }
 
       await addTask(newTask)
@@ -234,7 +231,7 @@ const SchedulePage: React.FC = () => {
             allTasks={tasks || []}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
-            onAddTask={handleAddTask}
+            onAddTask={(taskData) => handleAddTask(taskData.parentId)}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
             onCircularError={handleCircularError}

@@ -18,5 +18,8 @@
     "backend",
     "frontend",
     "infrastructure"
-  ]
-} 
+  ],
+  "dependencies": {
+    "react-hot-toast": "^2.5.2"
+  }
+}
