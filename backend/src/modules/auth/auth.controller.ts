@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, UseGuards, Request, HttpException, HttpSta
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthService } from './auth.service';
+import { CurrentUser } from './current-user.decorator';
 
 class LoginDto {
   email: string;
@@ -73,19 +74,24 @@ export class AuthController {
     }
   }
 
+  @Post('dev-login')
+  async devLogin(@Body() body: { email: string }) {
+    return this.authService.devLogin(body.email);
+  }
+
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user profile' })
-  async getProfile(@Request() req) {
-    return req.user;
+  async getProfile(@CurrentUser() user: any) {
+    return user;
   }
 
   @Get('projects')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get user projects' })
-  async getUserProjects(@Request() req) {
-    return this.authService.getUserProjects(req.user.id);
+  async getUserProjects(@CurrentUser() user: any) {
+    return this.authService.getUserProjects(user.id);
   }
 } 

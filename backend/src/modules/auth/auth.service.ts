@@ -193,4 +193,38 @@ export class AuthService {
   async getUserById(id: string) {
     return this.prisma.user.findUnique({ where: { id } });
   }
+
+  // Development login method - bypasses Cognito for demo purposes
+  async devLogin(email: string) {
+    try {
+      console.log('Development login for:', email);
+      
+      // Find user in database
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('Demo user not found. Please run database seeding first.');
+      }
+
+      // Generate JWT for API access
+      const payload = { 
+        sub: user.id, 
+        email: user.email,
+        cognitoId: user.cognitoId || 'dev-user'
+      };
+      const accessToken = this.jwtService.sign(payload);
+
+      console.log('Development login successful for user:', user.email);
+
+      return {
+        accessToken,
+        user,
+      };
+    } catch (error) {
+      console.error('Development login error:', error);
+      throw new UnauthorizedException(error.message || 'Development login failed');
+    }
+  }
 } 

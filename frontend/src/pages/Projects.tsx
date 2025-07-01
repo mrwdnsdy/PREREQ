@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Calendar, DollarSign, Users } from 'lucide-react'
 import api from '../services/api'
@@ -7,34 +7,76 @@ interface Project {
   id: string
   name: string
   client?: string
-  startDate: string
-  endDate: string
+  startDate?: string
+  endDate?: string
   budget?: number
-  members: Array<{
-    user: {
-      id: string
-      email: string
-      fullName?: string
-    }
-    role: string
-  }>
-  _count: {
-    tasks: number
-  }
+  taskCount: number
 }
 
 const Projects = () => {
-  const { data: projects, isLoading } = useQuery<Project[]>({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const response = await api.get('/projects')
-      return response.data
-    },
-  })
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
+  const fetchProjects = async () => {
+    try {
+      const response = await api.get('/auth/projects')
+      const projectsData = response.data.map((member: any) => ({
+        id: member.project.id,
+        name: member.project.name,
+        client: member.project.client,
+        startDate: member.project.startDate,
+        endDate: member.project.endDate,
+        budget: member.project.budget,
+        taskCount: member.project._count?.tasks || 0,
+      }))
+      setProjects(projectsData)
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Not set'
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const formatCurrency = (amount?: number) => {
+    if (!amount) return 'Not set'
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount)
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage your projects and their tasks
+            </p>
+          </div>
+        </div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-500">Loading projects...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -43,19 +85,14 @@ const Projects = () => {
         </div>
         <Link
           to="/projects/new"
-          className="btn btn-primary"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="h-4 w-4 mr-2" />
           New Project
         </Link>
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-500">Loading projects...</p>
-        </div>
-      ) : projects && projects.length > 0 ? (
+      {projects && projects.length > 0 ? (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Link
@@ -77,24 +114,21 @@ const Projects = () => {
                   <div className="flex items-center text-sm text-gray-500">
                     <Calendar className="w-4 h-4 mr-2" />
                     <span>
-                      {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}
+                      {formatDate(project.startDate)} - {formatDate(project.endDate)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center text-gray-500">
                       <Users className="w-4 h-4 mr-2" />
-                      <span>{project.members.length} members</span>
-                    </div>
-                    <div className="flex items-center text-gray-500">
-                      <span>{project._count.tasks} tasks</span>
+                      <span>{project.taskCount} tasks</span>
                     </div>
                   </div>
 
                   {project.budget && (
                     <div className="flex items-center text-sm text-gray-500">
                       <DollarSign className="w-4 h-4 mr-2" />
-                      <span>${project.budget.toLocaleString()}</span>
+                      <span>{formatCurrency(project.budget)}</span>
                     </div>
                   )}
                 </div>

@@ -1,33 +1,52 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, FolderOpen, BarChart3, Calendar } from 'lucide-react'
+import { 
+  FolderOpen, 
+  BarChart3, 
+  Plus, 
+  Calendar
+} from 'lucide-react'
+import { useState, useEffect } from 'react'
 import api from '../services/api'
 
 interface Project {
   id: string
   name: string
   client?: string
-  startDate: string
-  endDate: string
-  budget?: number
-  _count: {
-    tasks: number
-  }
+  startDate?: string
+  endDate?: string
+  taskCount: number
 }
 
 const Dashboard = () => {
-  const { data: projects, isLoading } = useQuery<Project[]>({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const response = await api.get('/projects')
-      return response.data
-    },
-  })
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const recentProjects = projects?.slice(0, 5) || []
+  useEffect(() => {
+    fetchProjects()
+  }, [])
+
+  const fetchProjects = async () => {
+    try {
+      const response = await api.get('/auth/projects')
+      const projectsData = response.data.map((member: any) => ({
+        id: member.project.id,
+        name: member.project.name,
+        client: member.project.client,
+        startDate: member.project.startDate,
+        endDate: member.project.endDate,
+        taskCount: member.project._count?.tasks || 0,
+      }))
+      setProjects(projectsData)
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -96,12 +115,12 @@ const Dashboard = () => {
           <h2 className="text-lg font-medium text-gray-900">Recent Projects</h2>
         </div>
         <div className="p-6">
-          {isLoading ? (
+          {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
               <p className="mt-2 text-sm text-gray-500">Loading projects...</p>
             </div>
-          ) : recentProjects.length === 0 ? (
+          ) : projects.length === 0 ? (
             <div className="text-center py-8">
               <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No projects</h3>
@@ -120,7 +139,7 @@ const Dashboard = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {recentProjects.map((project) => (
+              {projects.map((project) => (
                 <Link
                   key={project.id}
                   to={`/projects/${project.id}`}
@@ -134,15 +153,12 @@ const Dashboard = () => {
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-900">{project._count.tasks} tasks</p>
-                      {project.budget && (
-                        <p className="text-sm text-gray-500">${project.budget.toLocaleString()}</p>
-                      )}
+                      <p className="text-sm text-gray-900">{project.taskCount} tasks</p>
                     </div>
                   </div>
                 </Link>
               ))}
-              {projects && projects.length > 5 && (
+              {projects.length > 5 && (
                 <div className="text-center pt-4">
                   <Link
                     to="/projects"

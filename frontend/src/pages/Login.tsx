@@ -13,6 +13,20 @@ const Login = () => {
   const [message, setMessage] = useState('')
   const { login } = useAuth()
 
+  // Development login for demo user
+  const handleDevLogin = async () => {
+    setError('')
+    try {
+      console.log('Attempting dev login...')
+      const response = await api.post('/auth/dev-login', { email: 'demo@prereq.com' })
+      console.log('Dev login response:', response.data)
+      await login(response.data.accessToken)
+    } catch (err: any) {
+      console.error('Dev login error:', err)
+      setError(err.response?.data?.message || 'Development login failed')
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -143,6 +157,21 @@ const Login = () => {
             </button>
           </p>
         </div>
+
+        {/* Development Login */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-blue-800 mb-2">Development Mode</h3>
+          <p className="text-xs text-blue-600 mb-3">
+            Quick access to demo account with seeded project data
+          </p>
+          <button
+            onClick={handleDevLogin}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-sm font-medium"
+          >
+            Login as Demo User (demo@prereq.com)
+          </button>
+        </div>
+
         <form className="mt-8 space-y-6" onSubmit={isSignup ? handleSignup : handleLogin}>
           {error && (
             <div className="rounded-md bg-red-50 p-4">
