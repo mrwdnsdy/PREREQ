@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { Task } from '../hooks/useTasks'
 import { TaskRelation } from '../services/scheduleApi'
 import { DatePickerCell } from './DatePickerCell'
-import { Plus, Trash2, Edit2, Copy, Scissors } from 'lucide-react'
+import { ChevronRight, Plus, Trash2, Edit2, Copy, Scissors } from 'lucide-react'
 
 interface TaskTableProps {
   tasks: Task[]
@@ -13,6 +13,7 @@ interface TaskTableProps {
   selectedTaskId?: string
   onSelectTask: (taskId: string | null) => void
   onCircularError?: (error: string) => void
+  view: 'schedule' | 'details'
 }
 
 interface EditingState {
@@ -38,6 +39,54 @@ interface ContextMenuState {
   taskId: string | null
 }
 
+interface LagInputProps {
+  value: number
+  onChange: (value: number) => void
+}
+
+const LagInput: React.FC<LagInputProps> = ({ value, onChange }) => {
+  const [editing, setEditing] = useState(false)
+  const [inputValue, setInputValue] = useState(value.toString())
+
+  const handleSave = () => {
+    const numValue = parseInt(inputValue) || 0
+    onChange(numValue)
+    setEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave()
+    } else if (e.key === 'Escape') {
+      setInputValue(value.toString())
+      setEditing(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="number"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        className="w-full px-1 py-0.5 text-xs border rounded"
+        autoFocus
+      />
+    )
+  }
+
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      className="cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded"
+    >
+      {value}d
+    </span>
+  )
+}
+
 export const TaskTable: React.FC<TaskTableProps> = ({
   tasks,
   allTasks,
@@ -46,7 +95,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onAddTask,
   selectedTaskId,
   onSelectTask,
-  onCircularError
+  onCircularError,
+  view
 }) => {
   const [editingState, setEditingState] = useState<EditingState>({
     taskId: null,
@@ -69,6 +119,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     y: 0,
     taskId: null
   })
+
+  const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set())
 
   // Common styling classes
   const cell = "text-center align-middle py-1 px-2"
@@ -361,7 +413,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         case 'edit':
           const task = tasks.find(t => t.id === contextMenu.taskId)
           if (task) {
-            setEditingState({ taskId: task.id, field: 'name', value: task.name })
+            setEditingState({ taskId: task.id, field: 'name', value: task.title || task.name })
           }
           break
         case 'copy':
@@ -491,347 +543,315 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     </tr>
   )
 
+  // Calculate if task is driven by predecessors
+  const isDriven = (task: Task): boolean => {
+    return (task.predecessors && task.predecessors.length > 0) || false
+  }
+
+  // Calculate finish date based on predecessors
+  const calcFinish = (task: Task): Date => {
+    if (!isDriven(task)) {
+      return task.endDate
+    }
+    
+    // Find the latest predecessor finish + lag
+    let latestFinish = task.startDate
+    if (task.predecessors) {
+      for (const pred of task.predecessors) {
+        const predTask = tasks.find(t => t.id === pred.predecessorId)
+        if (predTask) {
+          const predFinish = new Date(predTask.endDate)
+          predFinish.setDate(predFinish.getDate() + (pred.lag || 0))
+          if (predFinish > latestFinish) {
+            latestFinish = predFinish
+          }
+        }
+      }
+    }
+    
+    // Add duration to start date
+    const finishDate = new Date(latestFinish)
+    finishDate.setDate(finishDate.getDate() + (task.duration || 1))
+    return finishDate
+  }
+
+  // Toggle task collapse
+  const toggleCollapse = (taskId: string) => {
+    setCollapsedTasks(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId)
+      } else {
+        newSet.add(taskId)
+      }
+      return newSet
+    })
+  }
+
+  // Filter visible tasks based on collapse state
+  const visibleTasks = useMemo(() => {
+    const visible: Task[] = []
+    
+    const addTaskAndChildren = (task: Task, parentCollapsed = false) => {
+      if (!parentCollapsed) {
+        visible.push(task)
+      }
+      
+      const children = tasks.filter(t => t.parentId === task.id)
+      const isCollapsed = collapsedTasks.has(task.id)
+      
+      children.forEach(child => {
+        addTaskAndChildren(child, parentCollapsed || isCollapsed)
+      })
+    }
+    
+    // Start with root tasks
+    const rootTasks = tasks.filter(t => !t.parentId)
+    rootTasks.forEach(task => addTaskAndChildren(task))
+    
+    return visible
+  }, [tasks, collapsedTasks])
+
   return (
-    <div className="relative overflow-hidden w-full h-full">
+    <div className="relative overflow-auto w-full">
       <table className="min-w-full border-separate border-spacing-y-1 text-sm">
         <thead>
           <tr>
-            <th className={head} style={{ width: '10%', minWidth: '100px' }}>
-              WBS Code
+            <th className={head} style={{ textAlign: 'left', paddingLeft: '8px' }}>
+              Task
             </th>
-            <th className={head} style={{ width: '35%', minWidth: '200px' }}>
-              Task Name
-            </th>
-            <th className={head} style={{ width: '10%', minWidth: '80px' }}>
-              Duration
-            </th>
-            <th className={head} style={{ width: '15%', minWidth: '120px' }}>
-              Start Date
-            </th>
-            <th className={head} style={{ width: '15%', minWidth: '120px' }}>
-              End Date
-            </th>
-            <th className={head} style={{ width: '15%', minWidth: '120px' }}>
-              Budget
-            </th>
+            {view === 'schedule' ? (
+              <>
+                <th className={head}>Type</th>
+                <th className={head}>Duration</th>
+                <th className={head}>Start</th>
+                <th className={head}>Finish</th>
+                <th className={head}>%</th>
+              </>
+            ) : (
+              <>
+                <th className={head}>Budget</th>
+                <th className={head}>Role1</th>
+                <th className={head}>Role2</th>
+                <th className={head}>Predecessors</th>
+                <th className={head}>Lag</th>
+              </>
+            )}
           </tr>
         </thead>
-        <tbody className="overflow-auto">
-          {tasks.length === 0 && !newRowState.isAdding ? (
-            <tr>
-              <td colSpan={6} className="py-8 text-center text-gray-500">
-                <div className="flex flex-col items-center gap-2">
-                  <span>No tasks yet. Click below to add your first task.</span>
-                  <button
-                    onClick={() => handleAddRow()}
-                    className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-sky-700 focus:ring-2 focus:ring-sky-500"
+        <tbody>
+          {visibleTasks.map((task) => {
+            const hasChildren = tasks.some(t => t.parentId === task.id)
+            const isCollapsed = collapsedTasks.has(task.id)
+            const taskDepth = depth(task.wbsPath || task.wbsCode || '')
+            const driven = isDriven(task)
+
+            return (
+              <tr
+                key={task.id}
+                className={`hover:bg-gray-50 transition-colors ${
+                  selectedTaskId === task.id ? 'bg-blue-50' : ''
+                } ${taskDepth % 2 === 1 ? 'bg-gray-25' : ''}`}
+                onContextMenu={(e) => handleRightClick(e, task.id)}
+                onClick={() => onSelectTask?.(task.id)}
+              >
+                {/* First column: WBS + Name with breadcrumb indentation */}
+                <td className="py-1 px-2 text-left">
+                  <div
+                    style={{ paddingLeft: `${taskDepth * 1.25}rem` }}
+                    className="relative flex items-center gap-1"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add First Task
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ) : (
-            <>
-              {tasks.map((task, index) => {
-                const level = getWbsLevel(task.wbsPath)
-                const indentLevel = getIndentationLevel(task.wbsPath)
-                const bgColor = getRowBackgroundColor(task.wbsPath)
-                const wbsTextColor = getWbsTextColor(task.wbsPath)
-                const taskNameTextColor = getTaskNameTextColor(task.wbsPath)
-                const borderColor = getBorderColor(task.wbsPath)
-                const formattedWbs = formatWbsCode(task.wbsPath)
-                const budgetRollup = calculateBudgetRollup(task)
-                
-                return (
-                  <React.Fragment key={task.id}>
-                    <tr
-                      className={`
-                        group hover:bg-opacity-80 transition-colors duration-150 ${bgColor} border-l-4 ${borderColor}
-                        ${selectedTaskId === task.id ? 'ring-2 ring-sky-500 ring-opacity-50' : ''}
-                      `}
-                      onClick={() => onSelectTask(task.id)}
-                      onContextMenu={(e) => handleRightClick(e, task.id)}
-                    >
-                      {/* WBS Path */}
-                      <td className={`${cell} rounded-l-md border border-r-0 border-gray-200`}>
-                        <div className="flex items-center justify-center gap-1">
-                          {/* Level Badge */}
-                          <span className={`inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full ${
-                            level === 0 ? 'bg-slate-700 text-white' :
-                            level === 1 ? 'bg-blue-600 text-white' :
-                            level === 2 ? 'bg-green-600 text-white' :
-                            level === 3 ? 'bg-purple-600 text-white' :
-                            level === 4 ? 'bg-yellow-600 text-white' :
-                            level === 5 ? 'bg-pink-600 text-white' :
-                            level === 6 ? 'bg-indigo-600 text-white' :
-                            'bg-orange-600 text-white'
-                          }`}>
-                            {level}
-                          </span>
-                          
-                          {isEditing(task.id, 'wbsPath') ? (
-                            <input
-                              type="text"
-                              value={editingState.value}
-                              onChange={(e) => handleStartEdit(task.id, 'wbsPath', e.target.value)}
-                              onBlur={handleSaveEdit}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveEdit()
-                                if (e.key === 'Escape') handleCancelEdit()
-                              }}
-                              className="flex-1 rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs font-mono"
-                              autoFocus
-                            />
-                          ) : (
-                            <span 
-                              className={`text-sm font-mono cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded ${wbsTextColor}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCellClick(task.id, 'wbsPath', task.wbsPath)
-                              }}
-                              title={`Level ${level} - Click to edit`}
-                            >
-                              {formattedWbs}
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                    {hasChildren && (
+                      <ChevronRight
+                        className={`h-4 w-4 cursor-pointer transition-transform ${
+                          isCollapsed ? 'rotate-0' : 'rotate-90'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleCollapse(task.id)
+                        }}
+                      />
+                    )}
+                    <span className="text-xs text-gray-400 font-mono">
+                      {task.wbsPath || task.wbsCode || ''}
+                    </span>
+                    <span className="truncate font-medium">
+                      {editingState.taskId === task.id && editingState.field === 'name' ? (
+                        <input
+                          type="text"
+                          value={editingState.value}
+                          onChange={(e) =>
+                            setEditingState(prev => ({ ...prev, value: e.target.value }))
+                          }
+                          onBlur={() => {
+                            onUpdateTask(task.id, { title: editingState.value })
+                            setEditingState({ taskId: null, field: null, value: null })
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              onUpdateTask(task.id, { title: editingState.value })
+                              setEditingState({ taskId: null, field: null, value: null })
+                            } else if (e.key === 'Escape') {
+                              setEditingState({ taskId: null, field: null, value: null })
+                            }
+                          }}
+                          className="w-full px-1 py-0.5 border rounded"
+                          autoFocus
+                        />
+                      ) : (
+                        task.title || task.name
+                      )}
+                    </span>
+                  </div>
+                </td>
 
-                      {/* Task Name with Visual Hierarchy */}
-                      <td className={`${cell} ${depth(task.wbsPath) % 2 ? "bg-gray-50" : ""} border border-x-0 border-gray-200`}>
-                        <div className="relative pl-4" style={{ paddingLeft: `${depth(task.wbsPath) * 1.25}rem` }}>
-                          <span className="absolute left-1 top-0 bottom-0 border-l border-dashed border-gray-300" />
-                          {isEditing(task.id, 'name') ? (
-                            <input
-                              type="text"
-                              value={editingState.value}
-                              onChange={(e) => handleStartEdit(task.id, 'name', e.target.value)}
-                              onBlur={handleSaveEdit}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveEdit()
-                                if (e.key === 'Escape') handleCancelEdit()
-                              }}
-                              className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
-                              autoFocus
-                            />
-                          ) : (
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCellClick(task.id, 'name', task.name)
-                              }}
-                              className={`cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-center text-sm ${getTaskNameTextColor(task.wbsPath)}`}
-                            >
-                              {task.name}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Duration */}
-                      <td className={`${cell} border border-x-0 border-gray-200`}>
-                        {isEditing(task.id, 'duration') ? (
-                          <input
-                            type="number"
-                            min="1"
-                            value={editingState.value}
-                            onChange={(e) => handleStartEdit(task.id, 'duration', parseInt(e.target.value) || 1)}
-                            onBlur={handleSaveEdit}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit()
-                              if (e.key === 'Escape') handleCancelEdit()
-                            }}
-                            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
-                            autoFocus
-                          />
-                        ) : (
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCellClick(task.id, 'duration', task.duration)
-                            }}
-                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm"
-                          >
-                            {task.duration}d
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Start Date - Editable */}
-                      <td className={`${cell} border border-x-0 border-gray-200`}>
-                        {isEditing(task.id, 'startDate') ? (
-                          <input
-                            type="date"
-                            value={editingState.value}
-                            onChange={(e) => handleStartEdit(task.id, 'startDate', e.target.value)}
-                            onBlur={() => {
-                              // Also update end date when start date changes
-                              const task = tasks.find(t => t.id === editingState.taskId)
-                              if (task) {
-                                const endDate = calculateEndDate(editingState.value, task.duration)
-                                onUpdateTask(editingState.taskId!, { startDate: editingState.value, endDate })
-                              }
-                              handleSaveEdit()
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                const task = tasks.find(t => t.id === editingState.taskId)
-                                if (task) {
-                                  const endDate = calculateEndDate(editingState.value, task.duration)
-                                  onUpdateTask(editingState.taskId!, { startDate: editingState.value, endDate })
-                                }
-                                handleSaveEdit()
-                              }
-                              if (e.key === 'Escape') handleCancelEdit()
-                            }}
-                            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
-                            autoFocus
-                          />
-                        ) : (
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCellClick(task.id, 'startDate', task.startDate)
-                            }}
-                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm"
-                          >
-                            {formatDate(task.startDate)}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* End Date - Editable */}
-                      <td className={`${cell} border border-x-0 border-gray-200`}>
-                        {isEditing(task.id, 'endDate') ? (
-                          <input
-                            type="date"
-                            value={editingState.value}
-                            onChange={(e) => handleStartEdit(task.id, 'endDate', e.target.value)}
-                            onBlur={handleSaveEdit}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit()
-                              if (e.key === 'Escape') handleCancelEdit()
-                            }}
-                            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center text-xs"
-                            autoFocus
-                          />
-                        ) : (
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCellClick(task.id, 'endDate', task.endDate)
-                            }}
-                            className="cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm"
-                          >
-                            {formatDate(task.endDate)}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Budget with Rollup */}
-                      <td className={`${cell} rounded-r-md border border-l-0 border-gray-200`}>
-                        <div className="flex flex-col items-center">
-                          {/* Show rollup total for parent tasks */}
-                          {tasks.some(t => t.parentId === task.id) && (
-                            <div className="text-sm font-bold text-green-700">
-                              {formatCurrency(budgetRollup)}
-                            </div>
-                          )}
-                          
-                          {/* Direct budget (editable) */}
-                          {isEditing(task.id, 'budget') ? (
-                            <input
-                              type="number"
-                              min="0"
-                              step="1000"
-                              value={editingState.value}
-                              onChange={(e) => handleStartEdit(task.id, 'budget', parseFloat(e.target.value) || 0)}
-                              onBlur={handleSaveEdit}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveEdit()
-                                if (e.key === 'Escape') handleCancelEdit()
-                              }}
-                              className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-center"
-                              autoFocus
-                            />
-                          ) : (
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCellClick(task.id, 'budget', task.budget)
-                              }}
-                              className={`cursor-pointer hover:bg-gray-100 hover:bg-opacity-50 px-1 py-0.5 rounded transition-colors duration-150 text-sm ${
-                                tasks.some(t => t.parentId === task.id) ? 'text-gray-500' : 'text-gray-800'
-                              }`}
-                            >
-                              {tasks.some(t => t.parentId === task.id) ? 
-                                `(${formatCurrency(task.budget || 0)})` : 
-                                formatCurrency(task.budget || 0)
-                              }
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* New row insertion */}
-                    {newRowState.isAdding && newRowState.afterTaskId === task.id && renderNewRow()}
-                  </React.Fragment>
-                )
-              })}
-
-              {/* New row at the end */}
-              {newRowState.isAdding && !newRowState.afterTaskId && renderNewRow()}
-
-              {/* Add button at the end */}
-              {!newRowState.isAdding && renderAddButton()}
-            </>
-          )}
+                {view === 'schedule' ? (
+                  <>
+                    {/* Type */}
+                    <td className={cell}>
+                      {task.isMilestone ? 'Milestone' : 'Task'}
+                    </td>
+                    
+                    {/* Duration */}
+                    <td className={cell}>
+                      {task.duration}d
+                    </td>
+                    
+                    {/* Start Date */}
+                    <td className={cell}>
+                      <DatePickerCell
+                        date={task.startDate}
+                        onChange={(date) => onUpdateTask(task.id, { startDate: date })}
+                      />
+                    </td>
+                    
+                    {/* Finish Date */}
+                    <td className={cell}>
+                      {driven ? (
+                        <span className="text-gray-600">
+                          {formatDate(calcFinish(task))}
+                        </span>
+                      ) : (
+                        <DatePickerCell
+                          date={task.endDate}
+                          onChange={(date) => onUpdateTask(task.id, { endDate: date })}
+                        />
+                      )}
+                    </td>
+                    
+                    {/* Progress % */}
+                    <td className={cell}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={task.progress || 0}
+                        onChange={(e) =>
+                          onUpdateTask(task.id, { progress: parseInt(e.target.value) || 0 })
+                        }
+                        className="w-16 px-1 py-0.5 text-xs border rounded text-center"
+                      />
+                      %
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    {/* Budget */}
+                    <td className={cell}>
+                      {formatCurrency(task.budget || 0)}
+                    </td>
+                    
+                    {/* Role1 */}
+                    <td className={cell}>
+                      <input
+                        type="text"
+                        value={task.resourceRole || ''}
+                        onChange={(e) =>
+                          onUpdateTask(task.id, { resourceRole: e.target.value })
+                        }
+                        className="w-full px-1 py-0.5 text-xs border rounded"
+                        placeholder="Role"
+                      />
+                    </td>
+                    
+                    {/* Role2 */}
+                    <td className={cell}>
+                      <input
+                        type="text"
+                        value={task.resourceRole2 || ''}
+                        onChange={(e) =>
+                          onUpdateTask(task.id, { resourceRole2: e.target.value })
+                        }
+                        className="w-full px-1 py-0.5 text-xs border rounded"
+                        placeholder="Role 2"
+                      />
+                    </td>
+                    
+                    {/* Predecessors */}
+                    <td className={cell}>
+                      <span className="text-xs text-gray-600">
+                        {task.predecessors?.map(p => p.predecessorId).join(', ') || '-'}
+                      </span>
+                    </td>
+                    
+                    {/* Lag */}
+                    <td className={cell}>
+                      <LagInput
+                        value={task.lag || 0}
+                        onChange={(lag) => onUpdateTask(task.id, { lag })}
+                      />
+                    </td>
+                  </>
+                )}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
 
       {/* Context Menu */}
       {contextMenu.visible && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-[150px]"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y
+          }}
         >
           <button
             onClick={() => handleContextMenuAction('add')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" />
-            Add Task
+            <Plus className="w-3 h-3" />
+            Add Child
           </button>
           <button
             onClick={() => handleContextMenuAction('edit')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-3 h-3" />
             Edit
           </button>
           <button
             onClick={() => handleContextMenuAction('copy')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
           >
-            <Copy className="w-4 h-4" />
+            <Copy className="w-3 h-3" />
             Copy
           </button>
           <button
             onClick={() => handleContextMenuAction('cut')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
           >
-            <Scissors className="w-4 h-4" />
+            <Scissors className="w-3 h-3" />
             Cut
           </button>
-          <div className="border-t border-gray-200 my-1"></div>
+          <hr className="my-1" />
           <button
             onClick={() => handleContextMenuAction('delete')}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
+            className="w-full text-left px-3 py-1 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3 h-3" />
             Delete
           </button>
         </div>

@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ChevronLeft, ChevronRight, AlertCircle, ClipboardIcon, ArrowLeft } from 'lucide-react'
+import { Plus, AlertCircle, ClipboardIcon, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { WbsTree } from '../components/WbsTree'
 import { TaskTable } from '../components/TaskTable'
 import { useAuth } from '../contexts/AuthContext'
 import { useTasks, Task } from '../hooks/useTasks'
-import { WbsNode } from '../services/scheduleApi'
 
 const EmptyState: React.FC<{
   icon: React.ReactNode
@@ -29,205 +27,71 @@ const EmptyState: React.FC<{
 const SchedulePage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const { isAuthenticated, loading: authLoading } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set())
-
-  console.log('SchedulePage: Auth state:', { user, isAuthenticated, authLoading })
-  console.log('SchedulePage: Project ID:', projectId)
-
-  // Use the shared tasks hook
+  const [view, setView] = useState<'schedule' | 'details'>('schedule')
+  
   const {
     tasks,
-    isLoading: tasksLoading,
+    isLoading,
+    error,
+    addTask,
     updateTask,
     deleteTask,
-    addTask,
-    isUpdating,
-    isDeleting,
-    isAdding,
-    error
   } = useTasks(projectId || '')
 
-  // Helper function to calculate WBS level (same logic as TaskTable)
-  const getWbsLevel = (wbsPath: string): number => {
-    if (!wbsPath) return 1
-    // Remove trailing zeros and count meaningful levels
-    const parts = wbsPath.split('.').filter(part => part !== '0' && part !== '')
-    return Math.max(1, parts.length)
-  }
-
-  // Convert tasks to WBS tree structure
-  const wbsTree = useMemo(() => {
-    if (!tasks || tasks.length === 0) return []
+  // Task creation handler
+  const handleAddTask = async (parentId?: string) => {
+    if (!projectId) return
     
-    console.log('Converting tasks to WBS tree:', tasks)
-    
-    // Create a map to store all nodes
-    const nodeMap = new Map<string, WbsNode>()
-    
-    // First pass: Create all nodes using WBS path level calculation
-    tasks.forEach(task => {
-      const wbsLevel = getWbsLevel(task.wbsPath || task.wbsCode || '')
-      const node: WbsNode = {
-        id: task.id,
-        code: task.wbsPath || task.wbsCode || '',
-        name: task.name,
-        parentId: task.parentId || undefined,
-        children: [],
-        level: wbsLevel, // Use calculated level from WBS path
-        collapsed: false
-      }
-      nodeMap.set(task.id, node)
-    })
-    
-    // Second pass: Build hierarchy based on parent-child relationships
-    const rootNodes: WbsNode[] = []
-    
-    tasks.forEach(task => {
-      const node = nodeMap.get(task.id)
-      if (!node) return
-      
-      if (task.parentId) {
-        // Find parent and add this node as child
-        const parent = nodeMap.get(task.parentId)
-        if (parent) {
-          parent.children.push(node)
-        } else {
-          // Parent not found, treat as root
-          rootNodes.push(node)
-        }
-      } else {
-        // No parent, this is a root node
-        rootNodes.push(node)
-      }
-    })
-    
-    // Sort nodes by WBS code at each level
-    const sortNodesByWbs = (nodes: WbsNode[]) => {
-      nodes.sort((a, b) => {
-        // Simple alphanumeric sort for WBS codes
-        return a.code.localeCompare(b.code, undefined, { numeric: true })
-      })
-      nodes.forEach(node => {
-        if (node.children.length > 0) {
-          sortNodesByWbs(node.children)
-        }
-      })
-    }
-    
-    sortNodesByWbs(rootNodes)
-    
-    console.log('Generated WBS tree with WBS path levels:', rootNodes)
-    return rootNodes
-  }, [tasks])
-
-  const isLoading = tasksLoading
-
-  const handleToggleCollapse = (nodeId: string) => {
-    setCollapsedNodes(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(nodeId)) {
-        newSet.delete(nodeId)
-      } else {
-        newSet.add(nodeId)
-      }
-      return newSet
-    })
-  }
-
-  const handleUpdateWbsNode = (nodeId: string, updates: Partial<WbsNode>) => {
-    // Find the corresponding task and update it
-    const task = tasks?.find(t => t.id === nodeId)
-    if (task) {
-      const taskUpdates: Partial<Task> = {}
-      if (updates.name) taskUpdates.name = updates.name
-      if (updates.code) taskUpdates.wbsPath = updates.code
-      
-      handleUpdateTask(nodeId, taskUpdates)
-    }
-  }
-
-  const handleAddWbsChild = (parentId: string) => {
-    // Find parent task to determine the new task's level and WBS code
-    const parentTask = tasks?.find(t => t.id === parentId)
-    if (parentTask) {
-      const newLevel = (parentTask.level || 1) + 1
-      const childCount = tasks?.filter(t => t.parentId === parentId).length || 0
-      const newWbsCode = `${parentTask.wbsPath || parentTask.wbsCode}.${childCount + 1}`
-      
-      const newTaskData: Partial<Task> = {
-        name: 'New Task',
-        parentId: parentId,
-        level: newLevel,
-        wbsPath: newWbsCode,
-        wbsCode: newWbsCode,
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0]
-      }
-      
-      handleAddTask(newTaskData)
-    }
-  }
-
-  const handleAddWbsSibling = (nodeId: string) => {
-    const task = tasks?.find(t => t.id === nodeId)
-    if (task) {
-      const siblingCount = tasks?.filter(t => t.parentId === task.parentId).length || 0
-      const basePath = task.parentId 
-        ? tasks?.find(t => t.id === task.parentId)?.wbsPath || tasks?.find(t => t.id === task.parentId)?.wbsCode || ''
-        : ''
-      
-      const newWbsCode = basePath 
-        ? `${basePath}.${siblingCount + 1}`
-        : `${siblingCount + 1}`
-      
-      const newTaskData: Partial<Task> = {
-        name: 'New Task',
-        parentId: task.parentId,
-        level: task.level,
-        wbsPath: newWbsCode,
-        wbsCode: newWbsCode,
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0]
-      }
-      
-      handleAddTask(newTaskData)
-    }
-  }
-
-  const handleDeleteWbsNode = (nodeId: string) => {
-    handleDeleteTask(nodeId)
-  }
-
-  const handleSelectWbsNode = (nodeId: string) => {
-    setSelectedTaskId(nodeId)
-  }
-
-  const handleAddWbs = async () => {
-    // Add root level WBS item
-    const rootCount = tasks?.filter(t => !t.parentId).length || 0
-    const newWbsCode = `${rootCount + 1}`
-    
-    const newTaskData: Partial<Task> = {
-      name: 'New WBS Item',
-      level: 1,
-      wbsPath: newWbsCode,
-      wbsCode: newWbsCode,
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0]
-    }
-    
-    handleAddTask(newTaskData)
-  }
-
-  const handleAddTask = async (taskData?: Partial<Task>) => {
     try {
-      console.log('SchedulePage: handleAddTask called with:', taskData)
-      addTask(taskData || {})
-    } catch (error: any) {
-      console.error('SchedulePage: Error in handleAddTask:', error)
-      toast.error('Failed to add task')
+      console.log('SchedulePage: Creating new task with parentId:', parentId)
+      
+      // Calculate next WBS code
+      const existingTasks = tasks || []
+      let newWbsCode = '1'
+      
+      if (parentId) {
+        const parent = existingTasks.find(t => t.id === parentId)
+        if (parent) {
+          const siblings = existingTasks.filter(t => t.parentId === parentId)
+          const maxSiblingCode = siblings.reduce((max, sibling) => {
+            const parts = sibling.wbsCode.split('.')
+            const lastPart = parseInt(parts[parts.length - 1] || '0')
+            return Math.max(max, lastPart)
+          }, 0)
+          newWbsCode = `${parent.wbsCode}.${maxSiblingCode + 1}`
+        }
+      } else {
+        const rootTasks = existingTasks.filter(t => !t.parentId)
+        const maxRootCode = rootTasks.reduce((max, task) => {
+          const firstPart = parseInt(task.wbsCode.split('.')[0] || '0')
+          return Math.max(max, firstPart)
+        }, 0)
+        newWbsCode = `${maxRootCode + 1}`
+      }
+
+      const newTask: Partial<Task> = {
+        title: 'New Task',
+        wbsCode: newWbsCode,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        projectId,
+        parentId: parentId || null,
+        duration: 7,
+        isMilestone: false,
+        budget: 0,
+        description: '',
+        resourceRole: '',
+        resourceQty: 1,
+        resourceUnit: 'days'
+      }
+
+      await addTask(newTask)
+      toast.success('Task created successfully!')
+    } catch (err) {
+      console.error('Failed to create task:', err)
+      toast.error('Failed to create task. Please try again.')
     }
   }
 
@@ -300,7 +164,7 @@ const SchedulePage: React.FC = () => {
 
   return (
     <main className="h-screen grid grid-rows-[auto_1fr]">
-      {/* Top bar */}
+      {/* Header */}
       <header className="h-14 flex items-center justify-between border-b bg-white/80 backdrop-blur px-6">
         <div className="flex items-center gap-4">
           <button
@@ -318,14 +182,30 @@ const SchedulePage: React.FC = () => {
           </span>
         </div>
         
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleAddWbs}
-            className="inline-flex items-center gap-1 rounded-md border border-sky-600 px-4 py-1.5 text-sm font-semibold text-sky-600 hover:bg-sky-50 focus:ring-2 focus:ring-sky-500"
-          >
-            <Plus className="w-4 h-4" />
-            Add WBS
-          </button>
+        <div className="flex items-center gap-4">
+          {/* Schedule / Details Toggle */}
+          <div className="flex items-center border border-gray-300 rounded-md">
+            <button
+              onClick={() => setView('schedule')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-l-md transition-colors ${
+                view === 'schedule'
+                  ? 'bg-sky-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Schedule
+            </button>
+            <button
+              onClick={() => setView('details')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-r-md transition-colors ${
+                view === 'details'
+                  ? 'bg-sky-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Details
+            </button>
+          </div>
           
           <button
             onClick={() => handleAddTask()}
@@ -338,46 +218,30 @@ const SchedulePage: React.FC = () => {
       </header>
 
       {/* Content */}
-      <div className="grid grid-cols-[300px_1fr] h-full overflow-hidden">
-        <aside className="border-r overflow-y-auto bg-white">
-          <WbsTree
-            nodes={wbsTree}
-            collapsedNodes={collapsedNodes}
-            onToggleCollapse={handleToggleCollapse}
-            onUpdateNode={handleUpdateWbsNode}
-            onAddChild={handleAddWbsChild}
-            onAddSibling={handleAddWbsSibling}
-            onDeleteNode={handleDeleteWbsNode}
-            onSelectNode={handleSelectWbsNode}
-            selectedNodeId={selectedTaskId}
-            className="h-full"
-          />
-        </aside>
-
-        <section className="overflow-auto p-6">
-          {!tasks || tasks.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <EmptyState
-                icon={<ClipboardIcon className="h-10 w-10 text-gray-300" />}
-                title="No tasks yet"
-                actionText="+ Add Task"
-                onAction={() => handleAddTask()}
-              />
-            </div>
-          ) : (
-            <TaskTable
-              tasks={tasks || []}
-              allTasks={tasks || []}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onAddTask={handleAddTask}
-              selectedTaskId={selectedTaskId}
-              onSelectTask={setSelectedTaskId}
-              onCircularError={handleCircularError}
+      <section className="overflow-auto">
+        {!tasks || tasks.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <EmptyState
+              icon={<ClipboardIcon className="h-10 w-10 text-gray-300" />}
+              title="No tasks yet"
+              actionText="+ Add Task"
+              onAction={() => handleAddTask()}
             />
-          )}
-        </section>
-      </div>
+          </div>
+        ) : (
+          <TaskTable
+            tasks={tasks || []}
+            allTasks={tasks || []}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onAddTask={handleAddTask}
+            selectedTaskId={selectedTaskId}
+            onSelectTask={setSelectedTaskId}
+            onCircularError={handleCircularError}
+            view={view}
+          />
+        )}
+      </section>
     </main>
   )
 }
