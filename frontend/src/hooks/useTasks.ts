@@ -28,6 +28,7 @@ interface BackendTask {
     lag: number
     predecessor: {
       id: string
+      activityId: string
       title: string
       wbsCode: string
     }
@@ -39,6 +40,7 @@ interface BackendTask {
     lag: number
     successor: {
       id: string
+      activityId: string
       title: string
       wbsCode: string
     }
@@ -66,6 +68,7 @@ export interface Task {
     lag: number
     predecessor: {
       id: string
+      activityId: string
       name: string
       wbsPath: string
     }
@@ -110,6 +113,7 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
       ...p,
       predecessor: {
         id: p.predecessor.id,
+        activityId: p.predecessor.activityId,
         name: p.predecessor.title,
         wbsPath: p.predecessor.wbsCode
       }

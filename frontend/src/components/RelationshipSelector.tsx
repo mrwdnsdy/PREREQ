@@ -12,6 +12,7 @@ interface TaskRelation {
     id: string
     name: string
     wbsPath: string
+    activityId?: string
   }
 }
 
@@ -80,7 +81,8 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
       predecessor: {
         id: task.id,
         name: task.name,
-        wbsPath: task.wbsPath
+        wbsPath: task.wbsPath,
+        activityId: task.activityId
       }
     }
 
@@ -120,37 +122,39 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Selected Relations Pills */}
-      <div className="flex flex-wrap gap-1 mb-2">
-        {value.map((relation) => (
-          <div
-            key={relation.id}
-            className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 group"
-          >
-            <span className="font-medium">{relation.predecessor.wbsPath}</span>
-            
-            {/* Relation Type Toggle */}
-            <select
-              value={relation.type}
-              onChange={(e) => updateRelationType(relation.id, e.target.value as any)}
-              className="bg-transparent border-0 text-xs font-bold text-sky-900 cursor-pointer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {relationTypes.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => removeRelation(relation.id)}
-              className="text-sky-600 hover:text-sky-800 transition-colors duration-150 opacity-0 group-hover:opacity-100"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
-      </div>
+      {value.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {value.map((relation) => (
+            <div key={relation.id} className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-gray-900">
+                  {relation.predecessor.activityId || relation.predecessor.wbsPath}
+                </span>
+                <span className="text-gray-600">{relation.predecessor.name}</span>
+                <span className="text-gray-500">({relation.type})</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <select
+                  value={relation.type}
+                  onChange={(e) => updateRelationType(relation.id, e.target.value as 'FS' | 'SS' | 'FF' | 'SF')}
+                  className="text-xs border border-gray-300 rounded px-1"
+                >
+                  <option value="FS">FS</option>
+                  <option value="SS">SS</option>
+                  <option value="FF">FF</option>
+                  <option value="SF">SF</option>
+                </select>
+                <button
+                  onClick={() => removeRelation(relation.id)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Add New Relation */}
       <div className="relative">
@@ -198,7 +202,7 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-medium text-gray-900 text-xs">{task.wbsPath}</span>
+                      <span className="font-medium text-gray-900 text-xs font-mono">{task.activityId}</span>
                       <span className="ml-2 text-gray-600 text-xs">{task.name}</span>
                     </div>
                     <span className="text-xs text-gray-500">

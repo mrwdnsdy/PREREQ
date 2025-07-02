@@ -1258,8 +1258,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     
                     {/* Predecessors */}
                     <td className={cell}>
-                      <span className="text-xs text-gray-600">
-                        {task.predecessors?.map(p => p.predecessorId).join(', ') || '-'}
+                      <span className="text-xs text-gray-600 font-mono">
+                        {task.predecessors?.map(p => p.predecessor.activityId).join(', ') || '-'}
                       </span>
                     </td>
                     

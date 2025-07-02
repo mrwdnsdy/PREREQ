@@ -242,12 +242,26 @@ export class TasksService {
       include: {
         predecessors: {
           include: {
-            predecessor: true,
+            predecessor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         successors: {
           include: {
-            successor: true,
+            successor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         children: true,
@@ -274,12 +288,26 @@ export class TasksService {
       include: {
         predecessors: {
           include: {
-            predecessor: true,
+            predecessor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         successors: {
           include: {
-            successor: true,
+            successor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         children: true,
@@ -298,12 +326,26 @@ export class TasksService {
         project: true,
         predecessors: {
           include: {
-            predecessor: true,
+            predecessor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         successors: {
           include: {
-            successor: true,
+            successor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         children: true,
@@ -368,12 +410,26 @@ export class TasksService {
       include: {
         predecessors: {
           include: {
-            predecessor: true,
+            predecessor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         successors: {
           include: {
-            successor: true,
+            successor: {
+              select: {
+                id: true,
+                activityId: true,
+                title: true,
+                wbsCode: true,
+              },
+            },
           },
         },
         children: true,
