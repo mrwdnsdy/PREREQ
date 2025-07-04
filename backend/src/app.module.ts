@@ -6,6 +6,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { RelationsModule } from './modules/relations/relations.module';
 import { P6ImportModule } from './modules/p6-import/p6-import.module';
 import { PortfolioModule } from './modules/portfolio/portfolio.module';
+import { DependenciesModule } from './modules/dependencies/dependencies.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { PortfolioModule } from './modules/portfolio/portfolio.module';
     RelationsModule,
     P6ImportModule,
     PortfolioModule,
+    DependenciesModule,
   ],
 })
 export class AppModule {} 

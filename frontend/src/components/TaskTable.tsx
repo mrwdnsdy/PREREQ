@@ -1105,15 +1105,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           {visibleTasks.map(task => (
             <React.Fragment key={task.id}>
               <tr
-                className={`transition-colors ${
+                className={`transition-colors cursor-pointer ${
                   task.isHeader
                     ? getRowBackgroundColor(task.wbsPath || task.wbsCode || '')
                     : 'bg-white'
                 } ${getBorderColor(task.wbsPath || task.wbsCode || '')} ${
-                  selectedTaskId === task.id ? 'ring-2 ring-blue-400' : ''
-                } hover:shadow-md transform hover:scale-[1.01] wbs-row border-l-4`}
+                  selectedTaskId === task.id ? 'ring-2 ring-blue-400 bg-blue-50' : ''
+                } hover:shadow-md hover:bg-gray-50 transform hover:scale-[1.01] wbs-row border-l-4`}
                 onContextMenu={(e) => handleRightClick(e, task.id)}
                 onClick={() => onSelectTask?.(task.id)}
+                title={task.isHeader ? undefined : "Click to view dependencies"}
               >
                 {/* Task Name with WBS */}
                 <td className={cell}>

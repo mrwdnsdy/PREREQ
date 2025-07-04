@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, AlertCircle, ClipboardIcon, Upload, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { TaskTable } from '../components/TaskTable'
+import { DependenciesPanel } from '../components/DependenciesPanel'
 import { useAuth } from '../contexts/AuthContext'
 import { useTasks, Task } from '../hooks/useTasks'
 import api from '../services/api'
@@ -53,6 +54,8 @@ const ProjectDetail: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showWbs, setShowWbs] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isDependenciesPanelOpen, setIsDependenciesPanelOpen] = useState(false)
+  const [isDependenciesPanelCollapsed, setIsDependenciesPanelCollapsed] = useState(false)
 
   // Get project info for the header
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -132,6 +135,30 @@ const ProjectDetail: React.FC = () => {
     toast.error(message)
   }
 
+  // Find the selected task object
+  const selectedTask = selectedTaskId ? tasks?.find(task => task.id === selectedTaskId) || null : null
+
+  // Handle task selection - always open dependencies panel when a task is selected
+  const handleSelectTask = (taskId: string | null) => {
+    setSelectedTaskId(taskId)
+    if (taskId) {
+      setIsDependenciesPanelOpen(true)
+      setIsDependenciesPanelCollapsed(false) // Ensure panel is expanded when opened
+    } else {
+      setIsDependenciesPanelOpen(false)
+    }
+  }
+
+  // Dependencies panel handlers
+  const handleCloseDependenciesPanel = () => {
+    setIsDependenciesPanelOpen(false)
+    setSelectedTaskId(null)
+  }
+
+  const handleToggleDependenciesPanel = () => {
+    setIsDependenciesPanelCollapsed(!isDependenciesPanelCollapsed)
+  }
+
   const handleDeleteProject = async () => {
     if (!projectId || !canDelete) return
 
@@ -207,9 +234,9 @@ const ProjectDetail: React.FC = () => {
 
   return (
     <>
-      <main className="h-screen grid grid-rows-[auto_1fr]">
+      <main className="h-screen grid grid-rows-[auto_1fr] relative">
         {/* Header */}
-        <header className="h-14 flex items-center justify-between border-b bg-white/80 backdrop-blur px-6">
+        <header className="h-14 flex items-center justify-between border-b bg-white/80 backdrop-blur px-6 relative z-10">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-semibold text-gray-900">
               {project?.name || 'Project Schedule'}
@@ -286,7 +313,13 @@ const ProjectDetail: React.FC = () => {
         </header>
 
         {/* Content */}
-        <section className="overflow-auto">
+        <section className={`overflow-auto transition-all duration-300 ${
+          isDependenciesPanelOpen 
+            ? isDependenciesPanelCollapsed 
+              ? 'mr-12' 
+              : 'mr-96' 
+            : ''
+        }`}>
           {!tasks || tasks.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex items-center justify-center h-full">
@@ -304,7 +337,7 @@ const ProjectDetail: React.FC = () => {
               onDeleteTask={handleDeleteTask}
               onAddTask={handleAddTaskFromTable}
               selectedTaskId={selectedTaskId}
-              onSelectTask={setSelectedTaskId}
+              onSelectTask={handleSelectTask}
               onCircularError={handleCircularError}
               view={view}
               showWbs={showWbs}
@@ -312,6 +345,17 @@ const ProjectDetail: React.FC = () => {
             />
           )}
         </section>
+
+        {/* Dependencies Panel */}
+        <DependenciesPanel
+          selectedTask={selectedTask}
+          allTasks={tasks || []}
+          projectId={projectId || ''}
+          isOpen={isDependenciesPanelOpen}
+          onClose={handleCloseDependenciesPanel}
+          onToggleCollapse={handleToggleDependenciesPanel}
+          isCollapsed={isDependenciesPanelCollapsed}
+        />
       </main>
 
       {/* Delete Confirmation Modal */}

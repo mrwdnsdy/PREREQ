@@ -4,6 +4,7 @@ import { Plus, AlertCircle, ClipboardIcon, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { TaskTable } from '../components/TaskTable'
+import { DependenciesPanel } from '../components/DependenciesPanel'
 import { useAuth } from '../contexts/AuthContext'
 import { useTasks, Task } from '../hooks/useTasks'
 
@@ -33,6 +34,8 @@ const SchedulePage: React.FC = () => {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [view, setView] = useState<'schedule' | 'details'>('schedule')
   const [showWbs, setShowWbs] = useState(true)
+  const [isDependenciesPanelOpen, setIsDependenciesPanelOpen] = useState(false)
+  const [isDependenciesPanelCollapsed, setIsDependenciesPanelCollapsed] = useState(false)
   
   const {
     tasks,
@@ -91,6 +94,30 @@ const SchedulePage: React.FC = () => {
     toast.error(message)
   }
 
+  // Find the selected task object
+  const selectedTask = selectedTaskId ? tasks?.find(task => task.id === selectedTaskId) || null : null
+
+  // Handle task selection - always open dependencies panel when a task is selected
+  const handleSelectTask = (taskId: string | null) => {
+    setSelectedTaskId(taskId)
+    if (taskId) {
+      setIsDependenciesPanelOpen(true)
+      setIsDependenciesPanelCollapsed(false) // Ensure panel is expanded when opened
+    } else {
+      setIsDependenciesPanelOpen(false)
+    }
+  }
+
+  // Dependencies panel handlers
+  const handleCloseDependenciesPanel = () => {
+    setIsDependenciesPanelOpen(false)
+    setSelectedTaskId(null)
+  }
+
+  const handleToggleDependenciesPanel = () => {
+    setIsDependenciesPanelCollapsed(!isDependenciesPanelCollapsed)
+  }
+
   if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -144,9 +171,9 @@ const SchedulePage: React.FC = () => {
   }
 
   return (
-    <main className="h-screen grid grid-rows-[auto_1fr]">
+    <main className="h-screen grid grid-rows-[auto_1fr] relative">
       {/* Header */}
-      <header className="h-14 flex items-center justify-between border-b bg-white/80 backdrop-blur px-6">
+      <header className="h-14 flex items-center justify-between border-b bg-white/80 backdrop-blur px-6 relative z-10">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(`/projects/${projectId}`)}
@@ -207,7 +234,13 @@ const SchedulePage: React.FC = () => {
       </header>
 
       {/* Content */}
-      <section className="overflow-auto">
+      <section className={`overflow-auto transition-all duration-300 ${
+        isDependenciesPanelOpen 
+          ? isDependenciesPanelCollapsed 
+            ? 'mr-12' 
+            : 'mr-96' 
+          : ''
+      }`}>
         {!tasks || tasks.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -223,7 +256,7 @@ const SchedulePage: React.FC = () => {
             onDeleteTask={handleDeleteTask}
             onAddTask={handleAddTaskFromTable}
             selectedTaskId={selectedTaskId}
-            onSelectTask={setSelectedTaskId}
+            onSelectTask={handleSelectTask}
             onCircularError={handleCircularError}
             view={view}
             showWbs={showWbs}
@@ -231,6 +264,17 @@ const SchedulePage: React.FC = () => {
           />
         )}
       </section>
+
+      {/* Dependencies Panel */}
+      <DependenciesPanel
+        selectedTask={selectedTask}
+        allTasks={tasks || []}
+        projectId={projectId || ''}
+        isOpen={isDependenciesPanelOpen}
+        onClose={handleCloseDependenciesPanel}
+        onToggleCollapse={handleToggleDependenciesPanel}
+        isCollapsed={isDependenciesPanelCollapsed}
+      />
     </main>
   )
 }
