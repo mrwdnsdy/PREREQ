@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.min.css'
+import { formatDate } from '../utils/dateFormat'
 
 interface DatePickerCellProps {
   value: string
@@ -26,10 +27,18 @@ export const DatePickerCell: React.FC<DatePickerCellProps> = ({
       flatpickrRef.current = flatpickr(inputRef.current, {
         dateFormat: 'Y-m-d',
         defaultDate: value,
+        onReady: () => {
+          if (inputRef.current) {
+            inputRef.current.value = formatDisplayDate(value)
+          }
+        },
         onChange: (selectedDates) => {
           if (selectedDates.length > 0) {
             const dateStr = selectedDates[0].toISOString().split('T')[0]
             onChange(dateStr)
+            if (inputRef.current) {
+              inputRef.current.value = formatDisplayDate(dateStr)
+            }
           }
         },
         onClose: () => {
@@ -67,11 +76,7 @@ export const DatePickerCell: React.FC<DatePickerCellProps> = ({
 
   const formatDisplayDate = (dateStr: string) => {
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
-        year: '2-digit'
-      })
+      return formatDate(dateStr)
     } catch {
       return dateStr
     }

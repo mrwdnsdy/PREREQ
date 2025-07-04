@@ -349,7 +349,11 @@ async function main() {
       costMaterial: 500,
       costOther: 300,
       resourceRole: 'Business Analyst',
-      resourceQty: 2.0
+      resourceQty: 2.0,
+      roleHours: {
+        'Business Analyst': 32,  // 4 days * 8 hours/day
+        'Data Analyst': 8        // Additional support
+      }
     },
     {
       wbsCode: '1.1.1.2',
@@ -363,7 +367,11 @@ async function main() {
       costMaterial: 200,
       costOther: 100,
       resourceRole: 'Business Analyst',
-      resourceQty: 1.5
+      resourceQty: 1.5,
+      roleHours: {
+        'Business Analyst': 24,   // 3 days * 8 hours/day
+        'Data Analyst': 16        // 2 days * 8 hours/day
+      }
     },
     {
       wbsCode: '1.1.2.1',
@@ -377,7 +385,11 @@ async function main() {
       costMaterial: 100,
       costOther: 50,
       resourceRole: 'Technical Writer',
-      resourceQty: 1.0
+      resourceQty: 1.0,
+      roleHours: {
+        'Technical Writer': 32,   // 4 days * 8 hours/day
+        'Business Analyst': 8     // Review support
+      }
     },
     {
       wbsCode: '1.1.2.2',
@@ -391,7 +403,11 @@ async function main() {
       costMaterial: 50,
       costOther: 25,
       resourceRole: 'Project Manager',
-      resourceQty: 1.0
+      resourceQty: 1.0,
+      roleHours: {
+        'Project Manager': 24,    // 3 days * 8 hours/day
+        'Business Analyst': 4     // Review support
+      }
     },
     {
       wbsCode: '2.1.1.1',
@@ -405,7 +421,12 @@ async function main() {
       costMaterial: 300,
       costOther: 200,
       resourceRole: 'Business Analyst',
-      resourceQty: 1.2
+      resourceQty: 1.2,
+      roleHours: {
+        'Business Analyst': 32,   // 4 days * 8 hours/day
+        'UI/UX Designer': 16,     // 2 days * 8 hours/day
+        'Project Manager': 8      // Coordination
+      }
     },
     {
       wbsCode: '2.1.1.2',
@@ -419,7 +440,12 @@ async function main() {
       costMaterial: 400,
       costOther: 300,
       resourceRole: 'Business Analyst',
-      resourceQty: 1.5
+      resourceQty: 1.5,
+      roleHours: {
+        'Business Analyst': 24,   // 3 days * 8 hours/day
+        'Project Manager': 16,    // 2 days * 8 hours/day
+        'UI/UX Designer': 8       // 1 day * 8 hours/day
+      }
     },
     {
       wbsCode: '2.1.2.1',
@@ -433,7 +459,12 @@ async function main() {
       costMaterial: 600,
       costOther: 400,
       resourceRole: 'Business Analyst',
-      resourceQty: 2.0
+      resourceQty: 2.0,
+      roleHours: {
+        'Business Analyst': 32,   // 4 days * 8 hours/day
+        'Solutions Architect': 8,  // 1 day * 8 hours/day
+        'Data Analyst': 16        // 2 days * 8 hours/day
+      }
     },
     {
       wbsCode: '2.1.2.2',
@@ -447,7 +478,13 @@ async function main() {
       costMaterial: 1000,
       costOther: 800,
       resourceRole: 'Solutions Architect',
-      resourceQty: 2.0
+      resourceQty: 2.0,
+      roleHours: {
+        'Solutions Architect': 32, // 4 days * 8 hours/day
+        'UI/UX Designer': 16,     // 2 days * 8 hours/day
+        'Developer': 8,           // 1 day * 8 hours/day
+        'Business Analyst': 8     // 1 day * 8 hours/day
+      }
     }
   ]
 
@@ -487,7 +524,8 @@ async function main() {
         totalCost: (taskData.costLabor || 0) + (taskData.costMaterial || 0) + (taskData.costOther || 0),
         resourceRole: taskData.resourceRole,
         resourceQty: taskData.resourceQty,
-        resourceUnit: taskData.resourceQty ? 'hours/day' : null
+        resourceUnit: taskData.resourceQty ? 'hours/day' : null,
+        roleHours: (taskData as any).roleHours || null
       }
     })
 

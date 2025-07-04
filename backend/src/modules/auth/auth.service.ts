@@ -132,13 +132,30 @@ export class AuthService {
       });
 
       if (!user) {
-        user = await this.prisma.user.create({
-          data: {
-            email,
-            cognitoId,
-            fullName,
-          },
+        // Check if user exists with this email
+        const existingUser = await this.prisma.user.findUnique({
+          where: { email },
         });
+
+        if (existingUser) {
+          // Update existing user with cognitoId
+          user = await this.prisma.user.update({
+            where: { email },
+            data: {
+              cognitoId,
+              fullName: fullName || existingUser.fullName,
+            },
+          });
+        } else {
+          // Create new user
+          user = await this.prisma.user.create({
+            data: {
+              email,
+              cognitoId,
+              fullName,
+            },
+          });
+        }
       }
 
       return user;

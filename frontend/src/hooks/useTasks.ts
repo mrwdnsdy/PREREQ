@@ -14,6 +14,7 @@ interface BackendTask {
   costLabor: number | { toString(): string } // Decimal from database
   costMaterial: number | { toString(): string } // Decimal from database
   costOther: number | { toString(): string } // Decimal from database
+  totalCost: number | { toString(): string } // Rolled-up total cost from database
   level: number
   projectId: string
   parentId?: string
@@ -21,6 +22,7 @@ interface BackendTask {
   resourceRole?: string
   resourceQty?: number
   resourceUnit?: string
+  roleHours?: Record<string, number> // Role-specific hours for level 4+ tasks
   predecessors: Array<{
     id: string
     predecessorId: string
@@ -84,8 +86,11 @@ export interface Task {
   resourceRole?: string
   resourceQty?: number
   resourceRole2?: string
+  roleHours?: Record<string, number> // Role-specific hours for level 4+ tasks
   // Task-level lag for relationships
   lag?: number
+  // Header flag (true when user marks row as Header/Sub-header)
+  isHeader?: boolean
 }
 
 // Transform backend task to frontend task
@@ -98,6 +103,11 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
   const costLabor = typeof backendTask.costLabor === 'number' ? backendTask.costLabor : Number(backendTask.costLabor.toString())
   const costMaterial = typeof backendTask.costMaterial === 'number' ? backendTask.costMaterial : Number(backendTask.costMaterial.toString())
   const costOther = typeof backendTask.costOther === 'number' ? backendTask.costOther : Number(backendTask.costOther.toString())
+  
+  // Use the backend's rolled-up totalCost field instead of calculating manually
+  const totalCost = typeof backendTask.totalCost === 'number' ? backendTask.totalCost : Number(backendTask.totalCost.toString())
+  
+
   
   return {
     id: backendTask.id,
@@ -119,7 +129,7 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
       }
     })),
     budget: (isNaN(costLabor) ? 0 : costLabor) + (isNaN(costMaterial) ? 0 : costMaterial) + (isNaN(costOther) ? 0 : costOther),
-    totalCost: (isNaN(costLabor) ? 0 : costLabor) + (isNaN(costMaterial) ? 0 : costMaterial) + (isNaN(costOther) ? 0 : costOther),
+    totalCost: isNaN(totalCost) ? 0 : totalCost, // Use the backend's rolled-up value
     percentComplete: 0, // This field doesn't exist in backend yet
     progress: 0, // For progress tracking
     isMilestone: backendTask.isMilestone,
@@ -129,8 +139,11 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
     resourceRole: backendTask.resourceRole,
     resourceQty: backendTask.resourceQty,
     resourceRole2: '', // Not in backend yet
+    roleHours: backendTask.roleHours || {},
     // Task-level lag (could be derived from relationships)
-    lag: 0
+    lag: 0,
+    // Determine header status: backend row is header when it has children
+    isHeader: (backendTask.children && backendTask.children.length > 0) || false
   }
 }
 
@@ -141,13 +154,12 @@ export const useTasks = (projectId: string) => {
   const { data: tasks, isLoading: tasksLoading, error } = useQuery({
     queryKey: ['project-tasks', projectId],
     queryFn: async () => {
-      console.log('useTasks: Fetching tasks for project:', projectId)
       const response = await api.get(`/tasks/project/${projectId}`)
-      console.log('useTasks: Raw backend response:', response.data)
       const backendTasks: BackendTask[] = response.data
-      const transformedTasks = backendTasks.map(transformBackendTask)
-      console.log('useTasks: Transformed tasks:', transformedTasks)
-      return transformedTasks
+      
+      const transformed = backendTasks.map(transformBackendTask)
+      
+      return transformed
     },
     enabled: !!projectId
   })
@@ -172,6 +184,7 @@ export const useTasks = (projectId: string) => {
       if (updates.parentId !== undefined) backendUpdates.parentId = updates.parentId
       if (updates.resourceRole !== undefined) backendUpdates.resourceRole = updates.resourceRole
       if (updates.resourceQty !== undefined) backendUpdates.resourceQty = updates.resourceQty
+      if (updates.roleHours !== undefined) backendUpdates.roleHours = updates.roleHours
       if (updates.progress !== undefined) {
         // Handle progress updates (may need to store in a different field or calculate)
         console.log('Progress update not yet implemented in backend:', updates.progress)
@@ -182,7 +195,7 @@ export const useTasks = (projectId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
-      toast.success('Task updated successfully')
+      // Removed individual success notifications - will use update button instead
     },
     onError: (error) => {
       console.error('useTasks: Error updating task:', error)
@@ -198,7 +211,7 @@ export const useTasks = (projectId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
-      toast.success('Task deleted successfully')
+      // Removed individual success notifications - will use update button instead
     },
     onError: (error) => {
       console.error('useTasks: Error deleting task:', error)
@@ -209,16 +222,13 @@ export const useTasks = (projectId: string) => {
   // Add task mutation
   const addTaskMutation = useMutation({
     mutationFn: (taskData: Partial<Task>) => {
-      const taskCount = (tasks?.length || 0) + 1
-      const wbsCode = taskData.wbsPath || taskData.wbsCode || `1.${taskCount}`
-      
-      console.log('useTasks: Adding task:', taskData)
-      
       // Map frontend field names to backend DTO field names
+      const title = (taskData.title && taskData.title.trim()) || (taskData.name && taskData.name.trim()) || 'New Task'
+      
       const backendTaskData = {
         projectId,
-        wbsCode: wbsCode,
-        title: taskData.name || `New Task ${taskCount}`,
+        // Remove wbsCode - let backend generate it
+        title: title,
         startDate: taskData.startDate || new Date().toISOString().split('T')[0],
         endDate: taskData.endDate || new Date().toISOString().split('T')[0],
         isMilestone: taskData.isMilestone || false,
@@ -226,19 +236,18 @@ export const useTasks = (projectId: string) => {
         costMaterial: 0,
         costOther: 0,
         description: '',
-        resourceRole: null,
-        resourceQty: null,
+        resourceRole: taskData.resourceRole || null,
+        resourceQty: taskData.resourceQty || null,
         resourceUnit: null,
-        level: taskData.level || 1,
-        parentId: taskData.parentId || null
+        parentId: taskData.parentId || null,
+        isHeader: taskData.isHeader || false
       }
       
-      console.log('useTasks: Backend task data:', backendTaskData)
       return api.post('/tasks', backendTaskData)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
-      toast.success('Task added successfully')
+      // Removed individual success notifications - will use update button instead
     },
     onError: (error) => {
       console.error('useTasks: Error creating task:', error)

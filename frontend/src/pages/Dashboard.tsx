@@ -1,173 +1,152 @@
+import React from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  FolderOpen, 
-  BarChart3, 
-  Plus, 
-  Calendar
-} from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { FolderOpen, Plus, BarChart3, Calendar } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { useEffect, useState } from 'react'
 import api from '../services/api'
 
 interface Project {
   id: string
   name: string
-  client?: string
-  startDate?: string
-  endDate?: string
+  client: string
   taskCount: number
+  createdAt: string
 }
 
 const Dashboard = () => {
+  const { user } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await api.get('/projects')
+        setProjects(response.data.slice(0, 3)) // Show only 3 recent projects
+      } catch (error) {
+        console.error('Failed to fetch projects:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchProjects()
   }, [])
 
-  const fetchProjects = async () => {
-    try {
-      const response = await api.get('/auth/projects')
-      const projectsData = response.data.map((member: any) => ({
-        id: member.project.id,
-        name: member.project.name,
-        client: member.project.client,
-        startDate: member.project.startDate,
-        endDate: member.project.endDate,
-        taskCount: member.project._count?.tasks || 0,
-      }))
-      setProjects(projectsData)
-    } catch (error) {
-      console.error('Failed to fetch projects:', error)
-    } finally {
-      setLoading(false)
+  const quickActions = [
+    {
+      title: 'Projects',
+      description: 'Manage your projects',
+      icon: FolderOpen,
+      href: '/projects',
+      color: 'text-primary-600'
+    },
+    {
+      title: 'Portfolio',
+      description: 'View all projects',
+      icon: BarChart3,
+      href: '/portfolio',
+      color: 'text-primary-600'
+    },
+    {
+      title: 'New Project',
+      description: 'Create a new project',
+      icon: Plus,
+      href: '/projects/new',
+      color: 'text-primary-600'
+    },
+    {
+      title: 'Timeline',
+      description: 'View project timeline',
+      icon: Calendar,
+      href: '/timeline',
+      color: 'text-primary-600'
     }
-  }
+  ]
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Welcome to PREREQ - Your Project Management Dashboard
+        <p className="mt-1 text-base text-gray-500">
+          Welcome back, {user?.fullName}
         </p>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link
-          to="/projects"
-          className="card p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center">
-            <FolderOpen className="h-8 w-8 text-primary-600" />
-            <div className="ml-4">
-              <h3 className="text-lg font-medium text-gray-900">Projects</h3>
-              <p className="text-sm text-gray-500">Manage your projects</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/portfolio"
-          className="card p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center">
-            <BarChart3 className="h-8 w-8 text-primary-600" />
-            <div className="ml-4">
-              <h3 className="text-lg font-medium text-gray-900">Portfolio</h3>
-              <p className="text-sm text-gray-500">View all projects</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/projects"
-          className="card p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center">
-            <Plus className="h-8 w-8 text-primary-600" />
-            <div className="ml-4">
-              <h3 className="text-lg font-medium text-gray-900">New Project</h3>
-              <p className="text-sm text-gray-500">Create a new project</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/projects"
-          className="card p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center">
-            <Calendar className="h-8 w-8 text-primary-600" />
-            <div className="ml-4">
-              <h3 className="text-lg font-medium text-gray-900">Timeline</h3>
-              <p className="text-sm text-gray-500">View project timeline</p>
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      {/* Recent Projects */}
-      <div className="card">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Recent Projects</h2>
+        {/* Quick Actions */}
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {quickActions.map((action) => (
+            <Link
+              key={action.title}
+              to={action.href}
+              className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm hover:border-gray-400 hover:shadow-md transition-all"
+            >
+              <div>
+                <action.icon className={`h-8 w-8 ${action.color}`} />
+              </div>
+              <div className="mt-3">
+                <h3 className="text-lg font-medium text-gray-900">{action.title}</h3>
+                <p className="text-base text-gray-500">{action.description}</p>
+              </div>
+            </Link>
+          ))}
         </div>
-        <div className="p-6">
+
+        {/* Recent Projects */}
+        <div className="mt-8">
+          <h2 className="text-lg font-medium text-gray-900">Recent Projects</h2>
+          
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-500">Loading projects...</p>
+              <p className="mt-2 text-base text-gray-500">Loading projects...</p>
             </div>
           ) : projects.length === 0 ? (
             <div className="text-center py-8">
               <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No projects</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by creating a new project.
+              <h3 className="mt-2 text-base font-medium text-gray-900">No projects</h3>
+              <p className="mt-1 text-base text-gray-500">
+                Get started by creating your first project.
               </p>
               <div className="mt-6">
                 <Link
-                  to="/projects"
-                  className="btn btn-primary"
+                  to="/projects/new"
+                  className="inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-base font-semibold text-white shadow-sm hover:bg-primary-700"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="mr-1.5 h-5 w-5" />
                   New Project
                 </Link>
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="mt-4 space-y-4">
               {projects.map((project) => (
                 <Link
                   key={project.id}
                   to={`/projects/${project.id}`}
-                  className="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="block relative rounded-lg border border-gray-200 bg-white px-6 py-4 shadow-sm hover:border-gray-300 hover:shadow-md transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-medium text-gray-900">{project.name}</h3>
+                      <h3 className="text-base font-medium text-gray-900">{project.name}</h3>
                       {project.client && (
-                        <p className="text-sm text-gray-500">{project.client}</p>
+                        <p className="text-base text-gray-500">{project.client}</p>
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-900">{project.taskCount} tasks</p>
+                      <p className="text-base text-gray-900">{project.taskCount} tasks</p>
                     </div>
                   </div>
                 </Link>
               ))}
-              {projects.length > 5 && (
-                <div className="text-center pt-4">
-                  <Link
-                    to="/projects"
-                    className="text-sm text-primary-600 hover:text-primary-500"
-                  >
-                    View all projects →
-                  </Link>
-                </div>
-              )}
+              
+              <div className="text-center pt-4">
+                <Link
+                  to="/projects"
+                  className="text-base text-primary-600 hover:text-primary-500"
+                >
+                  View all projects →
+                </Link>
+              </div>
             </div>
           )}
         </div>

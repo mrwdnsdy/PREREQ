@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, AlertCircle, ClipboardIcon, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useQueryClient } from '@tanstack/react-query'
 import { TaskTable } from '../components/TaskTable'
 import { useAuth } from '../contexts/AuthContext'
 import { useTasks, Task } from '../hooks/useTasks'
@@ -27,9 +28,11 @@ const EmptyState: React.FC<{
 const SchedulePage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { isAuthenticated, loading: authLoading } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [view, setView] = useState<'schedule' | 'details'>('schedule')
+  const [showWbs, setShowWbs] = useState(true)
   
   const {
     tasks,
@@ -38,6 +41,9 @@ const SchedulePage: React.FC = () => {
     addTask,
     updateTask,
     deleteTask,
+    isUpdating,
+    isAdding,
+    isDeleting
   } = useTasks(projectId || '')
 
   // Task creation handler
@@ -47,33 +53,9 @@ const SchedulePage: React.FC = () => {
     try {
       console.log('SchedulePage: Creating new task with parentId:', parentId)
       
-      // Calculate next WBS code
-      const existingTasks = tasks || []
-      let newWbsCode = '1'
-      
-      if (parentId) {
-        const parent = existingTasks.find(t => t.id === parentId)
-        if (parent) {
-          const siblings = existingTasks.filter(t => t.parentId === parentId)
-          const maxSiblingCode = siblings.reduce((max, sibling) => {
-            const parts = sibling.wbsCode.split('.')
-            const lastPart = parseInt(parts[parts.length - 1] || '0')
-            return Math.max(max, lastPart)
-          }, 0)
-          newWbsCode = `${parent.wbsCode}.${maxSiblingCode + 1}`
-        }
-      } else {
-        const rootTasks = existingTasks.filter(t => !t.parentId)
-        const maxRootCode = rootTasks.reduce((max, task) => {
-          const firstPart = parseInt(task.wbsCode.split('.')[0] || '0')
-          return Math.max(max, firstPart)
-        }, 0)
-        newWbsCode = `${maxRootCode + 1}`
-      }
-
+      // No WBS code generation - let backend handle it
       const newTask: Partial<Task> = {
         title: 'New Task',
-        wbsCode: newWbsCode,
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
         parentId: parentId || null,
@@ -85,20 +67,22 @@ const SchedulePage: React.FC = () => {
       }
 
       await addTask(newTask)
-      toast.success('Task created successfully!')
     } catch (err) {
       console.error('Failed to create task:', err)
-      toast.error('Failed to create task. Please try again.')
+      // Error notification is handled by useTasks hook
     }
   }
 
+  // Wrapper function to match TaskTable's expected signature
+  const handleAddTaskFromTable = async (task: Partial<Task>): Promise<void> => {
+    await addTask(task)
+  }
+
   const handleUpdateTask = (taskId: string, updates: Partial<Task>) => {
-    console.log('SchedulePage: handleUpdateTask called:', { taskId, updates })
     updateTask(taskId, updates)
   }
 
   const handleDeleteTask = (taskId: string) => {
-    console.log('SchedulePage: handleDeleteTask called:', taskId)
     deleteTask(taskId)
   }
 
@@ -174,12 +158,26 @@ const SchedulePage: React.FC = () => {
           <h1 className="text-xl font-semibold text-gray-900">
             Project Schedule
           </h1>
-          <span className="text-sm text-gray-500">
-            {projectId}
-          </span>
         </div>
         
         <div className="flex items-center gap-4">
+          {/* Update Schedule Button - shown when there are pending changes */}
+          {(isUpdating || isAdding || isDeleting) && (
+            <button
+              onClick={() => {
+                // Force refresh the data and show success message
+                queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+                toast.success('Schedule updated successfully!')
+              }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-500 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Update Schedule
+            </button>
+          )}
+          
           {/* Schedule / Details Toggle */}
           <div className="flex items-center border border-gray-300 rounded-md">
             <button
@@ -204,13 +202,7 @@ const SchedulePage: React.FC = () => {
             </button>
           </div>
           
-          <button
-            onClick={() => handleAddTask()}
-            className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-sky-700 focus:ring-2 focus:ring-sky-500"
-          >
-            <Plus className="w-4 h-4" />
-            Add Task
-          </button>
+
         </div>
       </header>
 
@@ -218,12 +210,10 @@ const SchedulePage: React.FC = () => {
       <section className="overflow-auto">
         {!tasks || tasks.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <EmptyState
-              icon={<ClipboardIcon className="h-10 w-10 text-gray-300" />}
-              title="No tasks yet"
-              actionText="+ Add Task"
-              onAction={() => handleAddTask()}
-            />
+            <div className="text-center">
+              <ClipboardIcon className="h-10 w-10 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No tasks yet</p>
+            </div>
           </div>
         ) : (
           <TaskTable
@@ -231,11 +221,13 @@ const SchedulePage: React.FC = () => {
             allTasks={tasks || []}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
-            onAddTask={(taskData) => handleAddTask(taskData.parentId)}
+            onAddTask={handleAddTaskFromTable}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
             onCircularError={handleCircularError}
             view={view}
+            showWbs={showWbs}
+            onToggleWbs={setShowWbs}
           />
         )}
       </section>

@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsOptional, IsNumber, IsBoolean, Min, Max } from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsNumber, IsBoolean, Min, Max, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateTaskDto {
@@ -11,9 +11,10 @@ export class CreateTaskDto {
   @IsString()
   parentId?: string;
 
-  @ApiProperty({ description: 'WBS code (e.g., 1.1, 1.2.1)' })
+  @ApiPropertyOptional({ description: 'WBS code (e.g., 1.1, 1.2.1) - will be auto-generated if not provided' })
+  @IsOptional()
   @IsString()
-  wbsCode: string;
+  wbsCode?: string;
 
   @ApiProperty({ description: 'Task title' })
   @IsString()
@@ -70,4 +71,12 @@ export class CreateTaskDto {
   @IsOptional()
   @IsString()
   resourceUnit?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Role-specific hours for level 4+ tasks (e.g., {"Developer": 16, "Designer": 8})',
+    example: { "Developer": 16, "Designer": 8, "Project Manager": 4 }
+  })
+  @IsOptional()
+  @IsObject()
+  roleHours?: Record<string, number>;
 } 

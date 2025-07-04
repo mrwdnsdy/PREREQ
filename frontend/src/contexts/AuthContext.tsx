@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 
 interface User {
@@ -33,7 +32,6 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const navigate = useNavigate()
 
   useEffect(() => {
     console.log('AuthProvider: Initializing...')
@@ -68,8 +66,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem('authToken', token)
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`
     await fetchUserProfile()
-    console.log('AuthProvider: Login complete, navigating to dashboard...')
-    navigate('/')
+    console.log('AuthProvider: Login complete')
+    // Navigation will be handled by the component calling login
   }
 
   const logout = () => {
@@ -77,7 +75,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('authToken')
     delete api.defaults.headers.common['Authorization']
     setUser(null)
-    navigate('/login')
+    // Navigation will be handled by React Router redirect logic
   }
 
   const value = {

@@ -12,6 +12,7 @@ import { ReactNode } from 'react'
 import NewProject from './pages/NewProject'
 import NewTask from './pages/NewTask'
 import SchedulePage from './pages/SchedulePage'
+import ImportSchedule from './pages/ImportSchedule'
 
 const queryClient = new QueryClient()
 
@@ -57,6 +58,7 @@ function AppRoutes() {
         <Route path="projects" element={<Projects />} />
         <Route path="projects/new" element={<NewProject />} />
         <Route path="projects/:id/tasks/new" element={<NewTask />} />
+        <Route path="projects/:projectId/import-schedule" element={<ImportSchedule />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="portfolio" element={<PortfolioView />} />
         <Route path="schedule/:projectId" element={<SchedulePage />} />

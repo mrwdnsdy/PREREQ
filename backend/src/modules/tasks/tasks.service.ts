@@ -12,24 +12,90 @@ export class TasksService {
     private authService: AuthService,
   ) {}
 
-  // Generate unique Activity ID
-  private async generateUniqueActivityId(): Promise<string> {
-    // Find the highest existing Activity ID
-    const lastTask = await this.prisma.task.findFirst({
-      select: { activityId: true },
-      orderBy: { activityId: 'desc' },
-    });
+  // Generate unique Activity ID with meaningful naming
+  private async generateUniqueActivityId(projectId?: string, level?: number): Promise<string> {
+    const maxRetries = 5;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        let activityId: string;
+        
+        if (projectId && level !== undefined) {
+          // Get project info for meaningful naming
+          const project = await this.prisma.project.findUnique({
+            where: { id: projectId },
+            select: { name: true }
+          });
+          
+          if (project) {
+            // Create project prefix from first 2-3 letters of project name
+            const projectPrefix = project.name
+              .toUpperCase()
+              .replace(/[^A-Z]/g, '')
+              .substring(0, 3)
+              .padEnd(3, 'X');
+            
+            // Generate level-based suffix
+            let suffix: string;
+            if (level <= 2) {
+              // High level tasks: PRJ-100, PRJ-200, etc.
+              const existingHighLevel = await this.prisma.task.findMany({
+                where: { 
+                  projectId,
+                  level: { lte: 2 },
+                  activityId: { startsWith: projectPrefix }
+                },
+                select: { activityId: true },
+                orderBy: { activityId: 'desc' }
+              });
+              
+              let nextNumber = 100;
+              if (existingHighLevel.length > 0) {
+                const lastId = existingHighLevel[0].activityId;
+                const match = lastId.match(/(\d+)$/);
+                if (match) {
+                  nextNumber = Math.max(100, parseInt(match[1]) + 100);
+                }
+              }
+              suffix = nextNumber.toString();
+            } else {
+              // Lower level tasks: use timestamp-based for now to avoid complexity
+              suffix = `${level}${Date.now().toString().slice(-4)}`;
+            }
+            
+            activityId = `${projectPrefix}-${suffix}`;
+          } else {
+            // Fallback if project not found
+            activityId = `TSK-${Date.now().toString().slice(-6)}-${attempt}`;
+          }
+        } else {
+          // Fallback for calls without context
+          activityId = `TSK-${Date.now().toString().slice(-6)}-${attempt}`;
+        }
 
-    let nextNumber = 1010; // Default starting number
-    if (lastTask?.activityId) {
-      // Extract the number from the Activity ID (e.g., "A1270" -> 1270)
-      const match = lastTask.activityId.match(/^A(\d+)$/);
-      if (match) {
-        nextNumber = parseInt(match[1]) + 10;
+        // Verify this ID doesn't already exist
+        const existingTask = await this.prisma.task.findFirst({
+          where: { activityId },
+          select: { id: true }
+        });
+
+        if (!existingTask) {
+          return activityId;
+        }
+
+        // If ID exists, will retry with incremented attempt
+      } catch (error) {
+        console.warn(`Activity ID generation attempt ${attempt + 1} failed:`, error);
+        if (attempt === maxRetries - 1) {
+          // Final fallback
+          const prefix = projectId ? 'ERR' : 'TSK';
+          return `${prefix}-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        }
       }
     }
 
-    return `A${nextNumber}`;
+    // Final fallback
+    return `TSK-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
   }
 
   private calculateLevel(parentId: string | null, projectId: string): Promise<number> {
@@ -89,11 +155,124 @@ export class TasksService {
     }
   }
 
+  private async generateUniqueWbsCode(projectId: string, parentId: string | null): Promise<string> {
+    if (!parentId) {
+      // Root level task - find highest root number
+      const rootTasks = await this.prisma.task.findMany({
+        where: {
+          projectId,
+          parentId: null,
+          level: { gte: 1 } // Exclude level 0 project root
+        },
+        select: { wbsCode: true },
+        orderBy: { wbsCode: 'desc' }
+      });
+
+      // Find the highest root number
+      let maxRoot = 0;
+      for (const task of rootTasks) {
+        const firstPart = parseInt(task.wbsCode.split('.')[0]);
+        if (!isNaN(firstPart) && firstPart > maxRoot) {
+          maxRoot = firstPart;
+        }
+      }
+
+      return `${maxRoot + 1}`;
+    }
+
+    // Child task - get parent's WBS code and find highest child number
+    const parent = await this.prisma.task.findUnique({
+      where: { id: parentId },
+      select: { wbsCode: true }
+    });
+
+    if (!parent) {
+      throw new BadRequestException('Parent task not found');
+    }
+
+    // Find all existing children of this parent
+    const siblings = await this.prisma.task.findMany({
+      where: {
+        projectId,
+        parentId: parentId
+      },
+      select: { wbsCode: true },
+      orderBy: { wbsCode: 'desc' }
+    });
+
+    const parentWbs = parent.wbsCode;
+    let maxChild = 0;
+
+    // Find the highest child number for this parent
+    for (const sibling of siblings) {
+      if (sibling.wbsCode.startsWith(`${parentWbs}.`)) {
+        const childPart = sibling.wbsCode.substring(parentWbs.length + 1);
+        const firstChildNumber = parseInt(childPart.split('.')[0]);
+        if (!isNaN(firstChildNumber) && firstChildNumber > maxChild) {
+          maxChild = firstChildNumber;
+        }
+      }
+    }
+
+    return `${parentWbs}.${maxChild + 1}`;
+  }
+
+  private async validateWbsCodeUniqueness(projectId: string, wbsCode: string, excludeTaskId?: string): Promise<void> {
+    const existingTask = await this.prisma.task.findFirst({
+      where: {
+        projectId,
+        wbsCode,
+        ...(excludeTaskId && { id: { not: excludeTaskId } })
+      },
+      select: { id: true, title: true }
+    });
+
+    if (existingTask) {
+      throw new BadRequestException(`WBS code "${wbsCode}" already exists in this project (used by task: "${existingTask.title}"). WBS codes must be unique within a project.`);
+    }
+  }
+
   // Calculate total cost for a task (direct costs only for leaf tasks)
-  private calculateDirectCost(costLabor: number, costMaterial: number, costOther: number): Decimal {
-    return new Decimal(costLabor || 0)
+  private calculateDirectCost(costLabor: number, costMaterial: number, costOther: number, roleHours?: Record<string, number>): Decimal {
+    let laborCost = new Decimal(costLabor || 0);
+    
+    // If roleHours are provided (for level 4+ tasks), calculate labor cost from role hours
+    if (roleHours && Object.keys(roleHours).length > 0) {
+      laborCost = this.calculateLaborCostFromRoleHours(roleHours);
+    }
+    
+    return laborCost
       .plus(new Decimal(costMaterial || 0))
       .plus(new Decimal(costOther || 0));
+  }
+
+  // Calculate labor cost from role-specific hours
+  private calculateLaborCostFromRoleHours(roleHours: Record<string, number>): Decimal {
+    // Define hourly rates for each role
+    const hourlyRates: Record<string, number> = {
+      'Business Analyst': 120,
+      'Technical Writer': 100,
+      'Project Manager': 180,
+      'Solutions Architect': 200,
+      'Developer': 150,
+      'Designer': 120,
+      'QA Engineer': 100,
+      'DevOps Engineer': 170,
+      'Data Analyst': 130,
+      'UI/UX Designer': 140,
+    };
+
+    const defaultRate = 125; // Default rate for unknown roles
+
+    let totalCost = new Decimal(0);
+    
+    for (const [role, hours] of Object.entries(roleHours)) {
+      const rate = hourlyRates[role] || defaultRate;
+      const roleCost = new Decimal(hours).times(new Decimal(rate));
+      totalCost = totalCost.plus(roleCost);
+    }
+    
+    return totalCost;
   }
 
   // Recursively calculate and update budget rollups for a task and its ancestors
@@ -166,7 +345,7 @@ export class TasksService {
       });
 
       if (project) {
-        const activityId = await this.generateUniqueActivityId();
+        const activityId = await this.generateUniqueActivityId(projectId, 0);
         await this.prisma.task.create({
           data: {
             activityId,
@@ -189,6 +368,8 @@ export class TasksService {
   }
 
   async create(createTaskDto: CreateTaskDto, userId: string) {
+    console.log('TasksService.create called with DTO:', createTaskDto);
+    
     // Check project access
     const hasAccess = await this.authService.hasProjectAccess(userId, createTaskDto.projectId, 'PM');
     if (!hasAccess) {
@@ -217,28 +398,54 @@ export class TasksService {
       }
     }
 
-    // Generate unique Activity ID
-    const activityId = await this.generateUniqueActivityId();
+    // Generate unique WBS code server-side to prevent duplicates
+    let wbsCode: string;
+    if (createTaskDto.wbsCode) {
+      // If frontend provides a WBS code, validate it's unique
+      await this.validateWbsCodeUniqueness(createTaskDto.projectId, createTaskDto.wbsCode);
+      wbsCode = createTaskDto.wbsCode;
+    } else {
+      // Generate unique WBS code server-side
+      wbsCode = await this.generateUniqueWbsCode(createTaskDto.projectId, createTaskDto.parentId);
+    }
 
-    // Calculate direct cost
+    // Generate unique Activity ID
+    const activityId = await this.generateUniqueActivityId(createTaskDto.projectId, level);
+
+    // Calculate direct cost (with role hours if level 4+)
     const directCost = this.calculateDirectCost(
       createTaskDto.costLabor || 0,
       createTaskDto.costMaterial || 0,
-      createTaskDto.costOther || 0
+      createTaskDto.costOther || 0,
+      level >= 4 ? createTaskDto.roleHours : undefined
     );
 
+    // Create taskData without spreading the DTO to avoid including fields that don't exist in DB
+    const taskData = {
+      projectId: createTaskDto.projectId,
+      title: createTaskDto.title,
+      description: createTaskDto.description || '',
+      isMilestone: createTaskDto.isMilestone || false,
+      resourceRole: createTaskDto.resourceRole || null,
+      resourceQty: createTaskDto.resourceQty || null,
+      resourceUnit: createTaskDto.resourceUnit || null,
+      roleHours: createTaskDto.roleHours || null,
+      parentId: createTaskDto.parentId || null,
+      wbsCode, // Use server-generated or validated WBS code
+      activityId,
+      level,
+      startDate: new Date(createTaskDto.startDate),
+      endDate: new Date(createTaskDto.endDate),
+      costLabor: new Decimal(createTaskDto.costLabor || 0),
+      costMaterial: new Decimal(createTaskDto.costMaterial || 0),
+      costOther: new Decimal(createTaskDto.costOther || 0),
+      totalCost: directCost,
+    };
+    
+    console.log('TasksService.create - Data to be saved to DB:', taskData);
+
     const task = await this.prisma.task.create({
-      data: {
-        ...createTaskDto,
-        activityId,
-        level,
-        startDate: new Date(createTaskDto.startDate),
-        endDate: new Date(createTaskDto.endDate),
-        costLabor: new Decimal(createTaskDto.costLabor || 0),
-        costMaterial: new Decimal(createTaskDto.costMaterial || 0),
-        costOther: new Decimal(createTaskDto.costOther || 0),
-        totalCost: directCost,
-      },
+      data: taskData,
       include: {
         predecessors: {
           include: {
@@ -267,6 +474,8 @@ export class TasksService {
         children: true,
       },
     });
+
+    console.log('TasksService.create - Task created with title:', task.title);
 
     // Update budget rollups
     await this.updateBudgetRollups(task.id);
@@ -388,12 +597,22 @@ export class TasksService {
       await this.validateWbsHierarchy(updateTaskDto.parentId, task.projectId, level);
     }
 
+    // If changing WBS code, validate uniqueness
+    if (updateTaskDto.wbsCode && updateTaskDto.wbsCode !== task.wbsCode) {
+      await this.validateWbsCodeUniqueness(task.projectId, updateTaskDto.wbsCode, task.id);
+    }
+
     // Calculate new direct cost if cost fields are updated
     const updatedCostLabor = updateTaskDto.costLabor !== undefined ? updateTaskDto.costLabor : Number(task.costLabor);
     const updatedCostMaterial = updateTaskDto.costMaterial !== undefined ? updateTaskDto.costMaterial : Number(task.costMaterial);
     const updatedCostOther = updateTaskDto.costOther !== undefined ? updateTaskDto.costOther : Number(task.costOther);
 
-    const newDirectCost = this.calculateDirectCost(updatedCostLabor, updatedCostMaterial, updatedCostOther);
+    const newDirectCost = this.calculateDirectCost(
+      updatedCostLabor, 
+      updatedCostMaterial, 
+      updatedCostOther,
+      level >= 4 ? updateTaskDto.roleHours : undefined
+    );
 
     const updatedTask = await this.prisma.task.update({
       where: { id },

@@ -8,12 +8,15 @@ import {
   Delete,
   UseGuards,
   Request,
+  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('Projects')
 @Controller('projects')
@@ -53,11 +56,21 @@ export class ProjectsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a project' })
-  @ApiResponse({ status: 200, description: 'Project deleted successfully' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  remove(@Param('id') id: string, @Request() req) {
-    return this.projectsService.remove(id, req.user.id);
+  @UseGuards(JwtAuthGuard)
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    // Only project owners can delete projects
+    const project = await this.projectsService.findOne(id, user.sub);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    // Check if user is project admin (highest role)
+    const membership = await this.projectsService.getUserProjectRole(user.sub, id);
+    if (membership?.role !== 'ADMIN') {
+      throw new ForbiddenException('Only project administrators can delete projects');
+    }
+
+    return this.projectsService.remove(id);
   }
 
   @Post(':id/members')

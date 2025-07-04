@@ -1,0 +1,11 @@
+Level,Activity ID,Activity Description,Type,Duration,Start Date,Finish Date,Predecessors,Resourcing,Budget,Notes
+1,,Web Platform Development,,60,2024-01-15,2024-03-15,,,,High priority project for client
+2,,Project Planning,,10,2024-01-15,2024-01-25,,Business Analyst: 40h,4800,Initial planning phase
+3,,Requirements Gathering,,5,2024-01-15,2024-01-20,,Business Analyst: 32h,3840,Gather detailed requirements
+3,,Project Charter,,3,2024-01-18,2024-01-21,3,"Business Analyst: 16h, Project Manager: 8h",2760,Create project charter
+2,,Development Phase,,35,2024-01-26,2024-03-05,2,,,"Main development work"
+3,,Frontend Development,,20,2024-01-26,2024-02-15,2,"Developer: 120h, Designer: 40h",23600,Build user interface
+4,,Component Development,,10,2024-01-26,2024-02-05,,"Developer: 80h",12000,Create reusable components
+4,,UI Integration,,10,2024-02-06,2024-02-15,4,"Developer: 40h, Designer: 40h",11600,Integrate UI components
+3,,Backend Development,,15,2024-02-01,2024-02-15,,"Developer: 80h, DevOps Engineer: 20h",14500,Server-side development
+2,,Testing & Deployment,,15,2024-03-01,2024-03-15,5,"QA Engineer: 60h, DevOps Engineer: 20h",10700,Final testing and deployment 

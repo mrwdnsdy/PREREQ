@@ -66,7 +66,7 @@ const Layout = () => {
               <User className="h-8 w-8 text-gray-400" />
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-700">{user?.fullName || user?.email}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
+                <p className="text-sm text-gray-500">{user?.email}</p>
               </div>
             </div>
             <button
@@ -107,7 +107,7 @@ const Layout = () => {
               <User className="h-8 w-8 text-gray-400" />
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-700">{user?.fullName || user?.email}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
+                <p className="text-sm text-gray-500">{user?.email}</p>
               </div>
             </div>
             <button

@@ -12,24 +12,70 @@ export class ProjectsService {
     private authService: AuthService,
   ) {}
 
-  // Generate unique Activity ID
-  private async generateUniqueActivityId(): Promise<string> {
-    // Find the highest existing Activity ID
-    const lastTask = await this.prisma.task.findFirst({
-      select: { activityId: true },
-      orderBy: { activityId: 'desc' },
-    });
+  // Generate unique Activity ID with meaningful naming
+  private async generateUniqueActivityId(projectName?: string): Promise<string> {
+    const maxRetries = 5;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        let activityId: string;
+        
+        if (projectName) {
+          // Create project prefix from first 2-3 letters of project name
+          const projectPrefix = projectName
+            .toUpperCase()
+            .replace(/[^A-Z]/g, '')
+            .substring(0, 3)
+            .padEnd(3, 'X');
+          
+          // Root task gets -000 suffix
+          activityId = `${projectPrefix}-000`;
+          
+          // If this exists, increment
+          let counter = 0;
+          while (counter < 999) {
+            const testId = `${projectPrefix}-${counter.toString().padStart(3, '0')}`;
+            const existingTask = await this.prisma.task.findFirst({
+              where: { activityId: testId },
+              select: { id: true }
+            });
+            
+            if (!existingTask) {
+              activityId = testId;
+              break;
+            }
+            counter++;
+          }
+        } else {
+          // Fallback for calls without project name
+          activityId = `ROOT-${Date.now().toString().slice(-6)}-${attempt}`;
+        }
 
-    let nextNumber = 1010; // Default starting number
-    if (lastTask?.activityId) {
-      // Extract the number from the Activity ID (e.g., "A1270" -> 1270)
-      const match = lastTask.activityId.match(/^A(\d+)$/);
-      if (match) {
-        nextNumber = parseInt(match[1]) + 10;
+        // Final verification
+        const existingTask = await this.prisma.task.findFirst({
+          where: { activityId },
+          select: { id: true }
+        });
+
+        if (!existingTask) {
+          return activityId;
+        }
+
+        // If still exists after all attempts, use fallback
+        if (attempt === maxRetries - 1) {
+          return `ROOT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        }
+      } catch (error) {
+        console.warn(`Activity ID generation attempt ${attempt + 1} failed:`, error);
+        if (attempt === maxRetries - 1) {
+          // Final fallback
+          return `ROOT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        }
       }
     }
 
-    return `A${nextNumber}`;
+    // Final fallback
+    return `ROOT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
   }
 
   async create(createProjectDto: CreateProjectDto, userId: string) {
@@ -43,17 +89,17 @@ export class ProjectsService {
       },
     });
 
-    // Add creator as PM
+    // Add creator as ADMIN (full permissions including delete)
     await this.prisma.projectMember.create({
       data: {
         userId,
         projectId: project.id,
-        role: 'PM',
+        role: 'ADMIN',
       },
     });
 
     // Create WBS Level 0 (project root) task
-    const activityId = await this.generateUniqueActivityId();
+    const activityId = await this.generateUniqueActivityId(project.name);
     await this.prisma.task.create({
       data: {
         activityId,
@@ -177,17 +223,51 @@ export class ProjectsService {
     return project;
   }
 
-  async remove(id: string, userId: string) {
-    const hasAccess = await this.authService.hasProjectAccess(userId, id, 'PM');
-    if (!hasAccess) {
-      throw new ForbiddenException('Insufficient permissions');
-    }
-
-    await this.prisma.project.delete({
-      where: { id },
+  async getUserProjectRole(userId: string, projectId: string) {
+    return this.prisma.projectMember.findFirst({
+      where: {
+        userId,
+        projectId,
+      },
+      select: {
+        role: true,
+      },
     });
+  }
 
-    return { message: 'Project deleted successfully' };
+  async remove(id: string) {
+    // Start a transaction to ensure all related data is deleted
+    return await this.prisma.$transaction(async (prisma) => {
+      // Delete task relations first (foreign key constraints)
+      await prisma.taskRelation.deleteMany({
+        where: {
+          OR: [
+            { predecessor: { projectId: id } },
+            { successor: { projectId: id } },
+          ],
+        },
+      });
+
+      // Delete all tasks in the project
+      await prisma.task.deleteMany({
+        where: { projectId: id },
+      });
+
+      // Delete project members
+      await prisma.projectMember.deleteMany({
+        where: { projectId: id },
+      });
+
+      // Finally delete the project
+      const deletedProject = await prisma.project.delete({
+        where: { id },
+      });
+
+      return { 
+        message: 'Project and all related data deleted successfully',
+        deletedProject 
+      };
+    });
   }
 
   async addMember(projectId: string, userId: string, memberUserId: string, role: 'ADMIN' | 'PM' | 'VIEWER') {

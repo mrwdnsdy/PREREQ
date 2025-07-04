@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, ChevronDown } from 'lucide-react'
 import { Task } from '../hooks/useTasks'
+import { formatDate } from '../utils/dateFormat'
 
 // Task relation interface that matches what useTasks expects
 interface TaskRelation {
@@ -206,7 +207,7 @@ export const RelationshipSelector: React.FC<RelationshipSelectorProps> = ({
                       <span className="ml-2 text-gray-600 text-xs">{task.name}</span>
                     </div>
                     <span className="text-xs text-gray-500">
-                      {task.startDate} - {task.endDate}
+                      {formatDate(task.startDate)} - {formatDate(task.endDate)}
                     </span>
                   </div>
                 </button>
