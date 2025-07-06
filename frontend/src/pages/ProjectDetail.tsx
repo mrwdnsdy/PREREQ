@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, AlertCircle, ClipboardIcon, Upload, Trash2 } from 'lucide-react'
+import { Plus, AlertCircle, ClipboardIcon, Upload, Trash2, ChevronLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { TaskTable } from '../components/TaskTable'
-import { DependenciesPanel } from '../components/DependenciesPanel'
+import { ResourceDrawer } from '../components/drawers/ResourceDrawer'
 import { useAuth } from '../contexts/AuthContext'
 import { useTasks, Task } from '../hooks/useTasks'
 import api from '../services/api'
@@ -50,12 +50,35 @@ const ProjectDetail: React.FC = () => {
   const queryClient = useQueryClient()
   const { isAuthenticated, loading: authLoading, user } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [view, setView] = useState<'schedule' | 'details'>('schedule')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showWbs, setShowWbs] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isDependenciesPanelOpen, setIsDependenciesPanelOpen] = useState(false)
-  const [isDependenciesPanelCollapsed, setIsDependenciesPanelCollapsed] = useState(false)
+  const [isResourceDrawerOpen, setIsResourceDrawerOpen] = useState(true)
+  const [isResourceDrawerCollapsed, setIsResourceDrawerCollapsed] = useState(true)
+  const [columnVisibility, setColumnVisibility] = useState({
+    level: true,
+    id: true,
+    description: true,
+    type: true,
+    plannedDuration: true,
+    startDate: true,
+    finishDate: true,
+    predecessor: true,
+    successor: true,
+    remainingDuration: true,
+    baselineStartDate: false,
+    baselineFinishDate: false,
+    accountableOrganization: true,
+    responsiblePersonnel: true,
+    projectManager: true,
+    flag: false,
+    reasoning: false,
+    juniorDesign: false,
+    intermediateDesign: false,
+    seniorDesign: false,
+    budget: true,
+    progress: true,
+  })
 
   // Get project info for the header
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -138,25 +161,25 @@ const ProjectDetail: React.FC = () => {
   // Find the selected task object
   const selectedTask = selectedTaskId ? tasks?.find(task => task.id === selectedTaskId) || null : null
 
-  // Handle task selection - always open dependencies panel when a task is selected
+  // Handle task selection - open resources panel when a task is selected
   const handleSelectTask = (taskId: string | null) => {
     setSelectedTaskId(taskId)
     if (taskId) {
-      setIsDependenciesPanelOpen(true)
-      setIsDependenciesPanelCollapsed(false) // Ensure panel is expanded when opened
+      setIsResourceDrawerOpen(true)
+      setIsResourceDrawerCollapsed(false)
     } else {
-      setIsDependenciesPanelOpen(false)
+      setIsResourceDrawerOpen(false)
     }
   }
 
-  // Dependencies panel handlers
-  const handleCloseDependenciesPanel = () => {
-    setIsDependenciesPanelOpen(false)
+  // Resource drawer handlers
+  const handleCloseResourceDrawer = () => {
+    setIsResourceDrawerOpen(false)
     setSelectedTaskId(null)
   }
 
-  const handleToggleDependenciesPanel = () => {
-    setIsDependenciesPanelCollapsed(!isDependenciesPanelCollapsed)
+  const handleToggleResourceDrawer = () => {
+    setIsResourceDrawerCollapsed(!isResourceDrawerCollapsed)
   }
 
   const handleDeleteProject = async () => {
@@ -234,11 +257,11 @@ const ProjectDetail: React.FC = () => {
 
   return (
     <>
-      <main className="h-screen grid grid-rows-[auto_1fr] relative">
+      <main className="h-screen flex flex-col relative">
         {/* Header */}
-        <header className="h-14 flex items-center justify-between border-b bg-white/80 backdrop-blur px-6 relative z-10">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-gray-900">
+        <header className="h-12 flex items-center justify-between border-b bg-white/80 backdrop-blur px-4 relative z-10 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold text-gray-900">
               {project?.name || 'Project Schedule'}
             </h1>
             {project?.client && (
@@ -246,7 +269,7 @@ const ProjectDetail: React.FC = () => {
             )}
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Update Schedule Button - shown when there are pending changes */}
             {(isUpdating || isAdding || isDeletingTask) && (
               <button
@@ -255,7 +278,7 @@ const ProjectDetail: React.FC = () => {
                   queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
                   toast.success('Schedule updated successfully!')
                 }}
-                className="inline-flex items-center gap-2 px-4 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-500 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-500 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -267,7 +290,7 @@ const ProjectDetail: React.FC = () => {
             {/* Import Schedule Button */}
             <button 
               onClick={() => navigate(`/projects/${projectId}/import-schedule`)}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-sky-500"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-sky-500"
             >
               <Upload className="w-4 h-4" />
               Import Schedule
@@ -277,84 +300,55 @@ const ProjectDetail: React.FC = () => {
             {canDelete && (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500"
+                className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete Project
               </button>
             )}
-            
-            {/* Schedule / Details Toggle */}
-            <div className="flex items-center border border-gray-300 rounded-md">
-              <button
-                onClick={() => setView('schedule')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-l-md transition-colors ${
-                  view === 'schedule'
-                    ? 'bg-sky-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Schedule
-              </button>
-              <button
-                onClick={() => setView('details')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-r-md transition-colors ${
-                  view === 'details'
-                    ? 'bg-sky-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Details
-              </button>
-            </div>
-            
-
           </div>
         </header>
 
         {/* Content */}
-        <section className={`overflow-auto transition-all duration-300 ${
-          isDependenciesPanelOpen 
-            ? isDependenciesPanelCollapsed 
-              ? 'mr-12' 
-              : 'mr-96' 
-            : ''
-        }`}>
+        <section className="flex-1 overflow-hidden">
           {!tasks || tasks.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <ClipboardIcon className="h-10 w-10 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No tasks yet</p>
-                </div>
+              <div className="text-center">
+                <ClipboardIcon className="h-10 w-10 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No tasks yet</p>
               </div>
             </div>
           ) : (
-            <TaskTable
-              tasks={tasks || []}
-              allTasks={tasks || []}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onAddTask={handleAddTaskFromTable}
-              selectedTaskId={selectedTaskId}
-              onSelectTask={handleSelectTask}
-              onCircularError={handleCircularError}
-              view={view}
-              showWbs={showWbs}
-              onToggleWbs={setShowWbs}
-            />
+            <div className="h-full overflow-auto">
+              <div className="flex min-w-max">
+                <TaskTable
+                  tasks={tasks || []}
+                  allTasks={tasks || []}
+                  onUpdateTask={handleUpdateTask}
+                  onDeleteTask={handleDeleteTask}
+                  onAddTask={handleAddTaskFromTable}
+                  onSelectTask={handleSelectTask}
+                  selectedTaskId={selectedTaskId}
+                  onCircularError={handleCircularError}
+                  projectId={projectId}
+                  showWbs={showWbs}
+                  onToggleWbs={setShowWbs}
+                />
+                <div className="w-80 shrink-0" />
+              </div>
+            </div>
           )}
         </section>
 
         {/* Dependencies Panel */}
-        <DependenciesPanel
+        <ResourceDrawer
           selectedTask={selectedTask}
           allTasks={tasks || []}
           projectId={projectId || ''}
-          isOpen={isDependenciesPanelOpen}
-          onClose={handleCloseDependenciesPanel}
-          onToggleCollapse={handleToggleDependenciesPanel}
-          isCollapsed={isDependenciesPanelCollapsed}
+          isOpen={isResourceDrawerOpen}
+          onClose={handleCloseResourceDrawer}
+          onToggleCollapse={handleToggleResourceDrawer}
+          isCollapsed={isResourceDrawerCollapsed}
         />
       </main>
 

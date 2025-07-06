@@ -21,6 +21,7 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:seed:resources": "ts-node prisma/seed-resources-only.ts",
     "db:seed:aws": "./scripts/seed-aws.sh"
   },
   "dependencies": {
@@ -48,6 +49,7 @@
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
+    "xlsx": "^0.18.5",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

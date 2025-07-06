@@ -63,4 +63,31 @@ export class P6ImportController {
 
     return this.p6ImportService.importXMLFile(file.buffer, projectId, req.user.id);
   }
+
+  @Post('excel')
+  @ApiOperation({ summary: 'Import Excel schedule template' })
+  @ApiResponse({ status: 201, description: 'Excel file imported successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file format' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async importExcel(
+    @Param('projectId') projectId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const validExtensions = ['.xlsx', '.xls'];
+    const hasValidExtension = validExtensions.some(ext => 
+      file.originalname.toLowerCase().endsWith(ext)
+    );
+
+    if (!hasValidExtension) {
+      throw new BadRequestException('File must be an Excel file (.xlsx or .xls)');
+    }
+
+    return this.p6ImportService.importExcelFile(file.buffer, projectId, req.user.id);
+  }
 } 

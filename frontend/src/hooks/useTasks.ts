@@ -75,6 +75,18 @@ export interface Task {
       wbsPath: string
     }
   }>
+  successors?: Array<{
+    id: string
+    successorId: string
+    type: string
+    lag: number
+    successor: {
+      id: string
+      activityId: string
+      name: string
+      wbsPath: string
+    }
+  }>
   budget: number
   totalCost?: number // For budget rollup calculations
   percentComplete: number
@@ -82,6 +94,7 @@ export interface Task {
   isMilestone: boolean
   level: number
   parentId?: string
+  description?: string // Task notes/description
   // Resource fields
   resourceRole?: string
   resourceQty?: number
@@ -91,6 +104,17 @@ export interface Task {
   lag?: number
   // Header flag (true when user marks row as Header/Sub-header)
   isHeader?: boolean
+  // New Excel columns
+  baselineStartDate?: string
+  baselineFinishDate?: string
+  accountableOrganization?: string
+  responsiblePersonnel?: string
+  projectManager?: string
+  flag?: string
+  reasoning?: string
+  juniorDesign?: number
+  intermediateDesign?: number
+  seniorDesign?: number
 }
 
 // Transform backend task to frontend task
@@ -135,6 +159,7 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
     isMilestone: backendTask.isMilestone,
     level: backendTask.level,
     parentId: backendTask.parentId,
+    description: backendTask.description,
     // Resource fields
     resourceRole: backendTask.resourceRole,
     resourceQty: backendTask.resourceQty,
@@ -182,6 +207,7 @@ export const useTasks = (projectId: string) => {
       if (updates.totalCost !== undefined) backendUpdates.costLabor = updates.totalCost
       if (updates.level !== undefined) backendUpdates.level = updates.level
       if (updates.parentId !== undefined) backendUpdates.parentId = updates.parentId
+      if (updates.description !== undefined) backendUpdates.description = updates.description
       if (updates.resourceRole !== undefined) backendUpdates.resourceRole = updates.resourceRole
       if (updates.resourceQty !== undefined) backendUpdates.resourceQty = updates.resourceQty
       if (updates.roleHours !== undefined) backendUpdates.roleHours = updates.roleHours
@@ -189,6 +215,18 @@ export const useTasks = (projectId: string) => {
         // Handle progress updates (may need to store in a different field or calculate)
         console.log('Progress update not yet implemented in backend:', updates.progress)
       }
+      
+      // Handle new Excel column fields - store as JSON or separate fields as needed
+      if (updates.baselineStartDate !== undefined) backendUpdates.baselineStartDate = updates.baselineStartDate
+      if (updates.baselineFinishDate !== undefined) backendUpdates.baselineFinishDate = updates.baselineFinishDate
+      if (updates.accountableOrganization !== undefined) backendUpdates.accountableOrganization = updates.accountableOrganization
+      if (updates.responsiblePersonnel !== undefined) backendUpdates.responsiblePersonnel = updates.responsiblePersonnel
+      if (updates.projectManager !== undefined) backendUpdates.projectManager = updates.projectManager
+      if (updates.flag !== undefined) backendUpdates.flag = updates.flag
+      if (updates.reasoning !== undefined) backendUpdates.reasoning = updates.reasoning
+      if (updates.juniorDesign !== undefined) backendUpdates.juniorDesign = updates.juniorDesign
+      if (updates.intermediateDesign !== undefined) backendUpdates.intermediateDesign = updates.intermediateDesign
+      if (updates.seniorDesign !== undefined) backendUpdates.seniorDesign = updates.seniorDesign
       
       console.log('useTasks: Backend updates:', backendUpdates)
       return api.patch(`/tasks/${taskId}`, backendUpdates)

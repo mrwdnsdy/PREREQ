@@ -13,9 +13,9 @@ interface TaskTableProps {
   selectedTaskId?: string
   onSelectTask: (taskId: string | null) => void
   onCircularError?: (error: string) => void
-  view: 'schedule' | 'details'
   showWbs?: boolean
   onToggleWbs?: (show: boolean) => void
+  projectId?: string
 }
 
 interface EditingState {
@@ -51,17 +51,28 @@ interface HeaderContextMenuState {
 }
 
 interface ColumnVisibility {
+  level: boolean
   id: boolean
+  description: boolean
   type: boolean
-  budget: boolean
-  duration: boolean
+  plannedDuration: boolean
   startDate: boolean
   finishDate: boolean
+  predecessor: boolean
+  successor: boolean
+  remainingDuration: boolean
+  baselineStartDate: boolean
+  baselineFinishDate: boolean
+  accountableOrganization: boolean
+  responsiblePersonnel: boolean
+  projectManager: boolean
+  flag: boolean
+  reasoning: boolean
+  juniorDesign: boolean
+  intermediateDesign: boolean
+  seniorDesign: boolean
+  budget: boolean
   progress: boolean
-  role1: boolean
-  role2: boolean
-  predecessors: boolean
-  lag: boolean
 }
 
 interface LagInputProps {
@@ -221,9 +232,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   selectedTaskId,
   onSelectTask,
   onCircularError,
-  view,
   showWbs = true,
-  onToggleWbs
+  onToggleWbs,
+  projectId
 }) => {
   const [editingState, setEditingState] = useState<EditingState>({
     taskId: null,
@@ -251,18 +262,39 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set())
   
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+  const defaultVisibility: ColumnVisibility = {
+    level: true,
     id: true,
+    description: true,
     type: true,
-    budget: true,
-    duration: true,
+    plannedDuration: true,
     startDate: true,
     finishDate: true,
-    progress: true,
-    role1: true,
-    role2: true,
-    predecessors: true,
-    lag: true
+    predecessor: true,
+    successor: true,
+    remainingDuration: true,
+    baselineStartDate: false,
+    baselineFinishDate: false,
+    accountableOrganization: true,
+    responsiblePersonnel: true,
+    projectManager: true,
+    flag: false,
+    reasoning: false,
+    juniorDesign: false,
+    intermediateDesign: false,
+    seniorDesign: false,
+    budget: true,
+    progress: true
+  }
+
+  const storageKey = `columnVisibility_${projectId || 'default'}`
+
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) return { ...defaultVisibility, ...JSON.parse(saved) }
+    } catch {}
+    return defaultVisibility
   })
 
   const [headerContextMenu, setHeaderContextMenu] = useState<HeaderContextMenuState>({
@@ -307,8 +339,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     })
 
     // Sort children at each level by WBS code
+    const compareWbsCodes = (codeA: string, codeB: string): number => {
+      const partsA = codeA.split('.').map(n => parseInt(n, 10))
+      const partsB = codeB.split('.').map(n => parseInt(n, 10))
+      const maxLen = Math.max(partsA.length, partsB.length)
+      for (let i = 0; i < maxLen; i++) {
+        const a = partsA[i] ?? 0
+        const b = partsB[i] ?? 0
+        if (a !== b) return a - b
+      }
+      return 0
+    }
+
     const sortChildrenRecursively = (tasks: (Task & { children: Task[] })[]) => {
-      tasks.sort((a, b) => (a.wbsPath || a.wbsCode || '').localeCompare(b.wbsPath || b.wbsCode || ''))
+      tasks.sort((a, b) => compareWbsCodes(a.wbsPath || a.wbsCode || '', b.wbsPath || b.wbsCode || ''))
       tasks.forEach(task => {
         if (task.children.length > 0) {
           sortChildrenRecursively(task.children as (Task & { children: Task[] })[])
@@ -319,17 +363,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     sortChildrenRecursively(rootTasks)
     
     // Flatten tree into display order, respecting collapse state
-    const flattenTree = (taskTree: (Task & { children: Task[] })[], result: Task[] = []): Task[] => {
-      taskTree.forEach(taskWithChildren => {
-        // Add the task itself (without the children property)
+    const flattenTree = (taskTree: (Task & { children: Task[] })[], result: Task[] = [], visited = new Set<string>()): Task[] => {
+      for (const taskWithChildren of taskTree) {
+        if (visited.has(taskWithChildren.id)) continue; // guard against cycles
+        visited.add(taskWithChildren.id)
+
         const { children, ...task } = taskWithChildren
         result.push(task)
-        
-        // Add children only if this task is not collapsed
+
         if (children.length > 0 && !collapsedTasks.has(task.id)) {
-          flattenTree(children as (Task & { children: Task[] })[], result)
+          flattenTree(children as (Task & { children: Task[] })[], result, visited)
         }
-      })
+      }
       return result
     }
     
@@ -361,9 +406,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   // Use tree structure for proper hierarchy
   const visibleTasks = buildTaskTree(tasks)
 
-  // Common styling classes
-  const cell = "text-center align-middle py-2 px-2 border border-gray-200"
-  const head = "sticky top-0 z-10 bg-white text-center text-sm font-semibold text-gray-500 py-3 border border-gray-200"
+  // Updated styling classes with better spacing and no text wrapping
+  const cell = "align-middle py-3 px-3 border border-gray-200 whitespace-nowrap text-sm"
+  const head = "sticky top-0 z-10 bg-white text-center text-xs font-semibold text-gray-500 py-4 px-3 border border-gray-200 whitespace-nowrap"
 
   // Depth calculation for visual nesting
   const depth = (code: string): number => code.split('.').length - 1
@@ -714,13 +759,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         }
       }
 
-      const newTask: Partial<Task> = {
+    const newTask: Partial<Task> = {
         // Remove wbsPath - let backend generate it
         name: newRowState.name || 'New Task',
-        duration: newRowState.duration,
-        startDate: newRowState.startDate,
+      duration: newRowState.duration,
+      startDate: newRowState.startDate,
         endDate: calculateEndDate(newRowState.startDate, newRowState.duration),
-        budget: newRowState.budget,
+      budget: newRowState.budget,
         isMilestone: false,
         predecessors: [],
         parentId: parentId || undefined,
@@ -836,6 +881,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     hideHeaderContextMenu()
   }
 
+  // Persist to localStorage whenever visibility changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(columnVisibility))
+    } catch {}
+  }, [columnVisibility])
+
   const handleContextMenuAction = (action: string) => {
     if (contextMenu.taskId) {
       switch (action) {
@@ -920,6 +972,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           </div>
         </td>
 
+        {/* Level */}
+        {columnVisibility.level && (
+          <td className={cell}>
+            <span className="text-sm text-gray-400">-</span>
+          </td>
+        )}
+
         {/* Activity ID */}
         {columnVisibility.id && (
           <td className={cell}>
@@ -933,115 +992,242 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           </td>
         )}
 
-        {view === 'schedule' ? (
-          <>
-            {/* Type */}
-            {columnVisibility.type && (
-              <td className={cell}>
-                <span className="text-gray-600 text-sm">{isHeader ? 'Header' : 'Activity'}</span>
-              </td>
-            )}
+        {/* Description */}
+        {columnVisibility.description && (
+          <td className={cell}>
+            <input
+              type="text"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="Description"
+            />
+          </td>
+        )}
 
-            {/* Budget */}
-            {columnVisibility.budget && (
-              <td className={cell}>
-                <input
-                  type="number"
-                  value={newRowState.budget}
-                  onChange={(e) => setNewRowState(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
-                  className="w-full px-1 py-0.5 text-sm border rounded"
-                />
-              </td>
-            )}
+        {/* Type */}
+        {columnVisibility.type && (
+          <td className={cell}>
+            <span className="text-gray-600 text-sm">{isHeader ? 'WBS Header' : 'Activity'}</span>
+          </td>
+        )}
 
-            {/* Duration */}
-            {columnVisibility.duration && (
-              <td className={cell}>
-                <input
-                  type="number"
-                  value={newRowState.duration}
-                  onChange={(e) => setNewRowState(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
-                  className="w-full px-1 py-0.5 text-sm border rounded"
-                />
-              </td>
-            )}
+        {/* Planned Duration */}
+        {columnVisibility.plannedDuration && (
+          <td className={cell}>
+            <input
+              type="number"
+              value={newRowState.duration}
+              onChange={(e) => setNewRowState(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
+              className="w-full px-1 py-0.5 text-sm border rounded"
+            />
+          </td>
+        )}
 
-            {/* Start Date */}
-            {columnVisibility.startDate && (
-              <td className={cell}>
-                <DatePickerCell
-                  value={newRowState.startDate}
-                  onChange={(date) => setNewRowState(prev => ({ ...prev, startDate: date }))}
-                />
-              </td>
-            )}
+        {/* Start Date */}
+        {columnVisibility.startDate && (
+          <td className={cell}>
+            <DatePickerCell
+              value={newRowState.startDate}
+              onChange={(date) => setNewRowState(prev => ({ ...prev, startDate: date }))}
+            />
+          </td>
+        )}
 
-            {/* Finish Date */}
-            {columnVisibility.finishDate && (
-              <td className={cell}>
-                {calculateEndDate(newRowState.startDate, newRowState.duration)}
-              </td>
-            )}
+        {/* Finish Date */}
+        {columnVisibility.finishDate && (
+          <td className={cell}>
+            {calculateEndDate(newRowState.startDate, newRowState.duration)}
+          </td>
+        )}
 
-            {/* Progress % */}
-            {columnVisibility.progress && (
-              <td className={cell}>
-                <div className="flex items-center gap-1 justify-center">
-                  <span className="text-sm">0%</span>
-                </div>
-              </td>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Budget */}
-            {columnVisibility.budget && (
-              <td className={cell}>{formatCurrency(newRowState.budget)}</td>
-            )}
+        {/* Predecessor */}
+        {columnVisibility.predecessor && (
+          <td className={cell}>
+            <span className="text-sm text-gray-400">-</span>
+          </td>
+        )}
 
-            {/* Role1 */}
-            {columnVisibility.role1 && (
-              <td className={cell}>
-                <span className="text-gray-400 text-sm">-</span>
-              </td>
-            )}
+        {/* Successor */}
+        {columnVisibility.successor && (
+          <td className={cell}>
+            <span className="text-sm text-gray-400">-</span>
+          </td>
+        )}
 
-            {/* Role2 */}
-            {columnVisibility.role2 && (
-              <td className={cell}>
-                <span className="text-gray-400 text-sm">-</span>
-              </td>
-            )}
+        {/* Remaining Duration */}
+        {columnVisibility.remainingDuration && (
+          <td className={cell}>
+            <span className="text-sm">{newRowState.duration}d</span>
+          </td>
+        )}
 
-            {/* Predecessors */}
-            {columnVisibility.predecessors && (
-              <td className={cell}>
-                <span className="text-sm text-gray-600 font-mono">-</span>
-              </td>
-            )}
+        {/* Baseline Start Date */}
+        {columnVisibility.baselineStartDate && (
+          <td className={cell}>
+            <span className="text-sm text-gray-400">-</span>
+          </td>
+        )}
 
-            {/* Lag */}
-            {columnVisibility.lag && (
-              <td className={cell}>
-                <span className="text-sm">0</span>
-              </td>
-            )}
-          </>
+        {/* Baseline Finish Date */}
+        {columnVisibility.baselineFinishDate && (
+          <td className={cell}>
+            <span className="text-sm text-gray-400">-</span>
+          </td>
+        )}
+
+        {/* Accountable Organization */}
+        {columnVisibility.accountableOrganization && (
+          <td className={cell}>
+            <input
+              type="text"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="Organization"
+            />
+          </td>
+        )}
+
+        {/* Responsible Personnel */}
+        {columnVisibility.responsiblePersonnel && (
+          <td className={cell}>
+            <input
+              type="text"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="Personnel"
+            />
+          </td>
+        )}
+
+        {/* Project Manager */}
+        {columnVisibility.projectManager && (
+          <td className={cell}>
+            <input
+              type="text"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="PM"
+            />
+          </td>
+        )}
+
+        {/* Flag */}
+        {columnVisibility.flag && (
+          <td className={cell}>
+            <input
+              type="text"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="Flag"
+            />
+          </td>
+        )}
+
+        {/* Reasoning */}
+        {columnVisibility.reasoning && (
+          <td className={cell}>
+            <input
+              type="text"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="Reasoning"
+            />
+          </td>
+        )}
+
+        {/* Junior Design */}
+        {columnVisibility.juniorDesign && (
+          <td className={cell}>
+            <input
+              type="number"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="0"
+            />
+          </td>
+        )}
+
+        {/* Intermediate Design */}
+        {columnVisibility.intermediateDesign && (
+          <td className={cell}>
+            <input
+              type="number"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="0"
+            />
+          </td>
+        )}
+
+        {/* Senior Design */}
+        {columnVisibility.seniorDesign && (
+          <td className={cell}>
+            <input
+              type="number"
+              value=""
+              className="w-full px-1 py-0.5 text-sm border rounded"
+              placeholder="0"
+            />
+          </td>
+        )}
+
+        {/* Budget */}
+        {columnVisibility.budget && (
+          <td className={cell}>
+            <input
+              type="number"
+              value={newRowState.budget}
+              onChange={(e) => setNewRowState(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
+              className="w-full px-1 py-0.5 text-sm border rounded"
+            />
+          </td>
+        )}
+
+        {/* Progress % */}
+        {columnVisibility.progress && (
+          <td className={cell}>
+            <div className="flex items-center gap-1 justify-center">
+              <span className="text-sm">0%</span>
+            </div>
+          </td>
         )}
       </tr>
     )
   }
 
   return (
-    <div className="relative">
-
-      
-      <table className="w-full table-auto border-collapse border border-gray-200">
+    <div className="h-full overflow-auto">
+      <table className="w-full table-auto min-w-[1600px] border-collapse border border-gray-200">
+        <colgroup>
+          <col className="w-80" /> {/* WBS/Task Name - wider for hierarchy */}
+          {columnVisibility.level && <col className="w-16" />} {/* Level */}
+          {columnVisibility.id && <col className="w-20" />} {/* ID */}
+          {columnVisibility.description && <col className="w-48" />} {/* Description */}
+          {columnVisibility.type && <col className="w-24" />} {/* Type */}
+          {columnVisibility.plannedDuration && <col className="w-20" />} {/* Planned Duration */}
+          {columnVisibility.startDate && <col className="w-28" />} {/* Start Date */}
+          {columnVisibility.finishDate && <col className="w-28" />} {/* Finish Date */}
+          {columnVisibility.predecessor && <col className="w-24" />} {/* Predecessor */}
+          {columnVisibility.successor && <col className="w-24" />} {/* Successor */}
+          {columnVisibility.remainingDuration && <col className="w-20" />} {/* Remaining Duration */}
+          {columnVisibility.baselineStartDate && <col className="w-28" />} {/* Baseline Start Date */}
+          {columnVisibility.baselineFinishDate && <col className="w-28" />} {/* Baseline Finish Date */}
+          {columnVisibility.accountableOrganization && <col className="w-40" />} {/* Accountable Organization */}
+          {columnVisibility.responsiblePersonnel && <col className="w-40" />} {/* Responsible Personnel */}
+          {columnVisibility.projectManager && <col className="w-32" />} {/* Project Manager */}
+          {columnVisibility.flag && <col className="w-24" />} {/* Flag */}
+          {columnVisibility.reasoning && <col className="w-48" />} {/* Reasoning */}
+          {columnVisibility.juniorDesign && <col className="w-20" />} {/* Junior Design */}
+          {columnVisibility.intermediateDesign && <col className="w-20" />} {/* Intermediate Design */}
+          {columnVisibility.seniorDesign && <col className="w-20" />} {/* Senior Design */}
+          {columnVisibility.budget && <col className="w-24" />} {/* Budget */}
+          {columnVisibility.progress && <col className="w-20" />} {/* Progress */}
+        </colgroup>
         <thead>
           <tr className="bg-gray-50">
             <th className={head}>
               <div className="flex flex-col items-center justify-center">
-                <span>WBS</span>
+                <span className="font-semibold">WBS</span>
                 {onToggleWbs && (
                   <label className="flex items-center gap-1 cursor-pointer mt-1">
                     <input
@@ -1050,54 +1236,76 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       onChange={(e) => onToggleWbs(e.target.checked)}
                       className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-500">Show WBS Code</span>
+                    <span className="text-xs text-gray-500">Show Code</span>
                   </label>
                 )}
               </div>
             </th>
+            {columnVisibility.level && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'level')}>Level</th>
+            )}
             {columnVisibility.id && (
               <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'id')}>ID</th>
             )}
-            {view === 'schedule' && (
-              <>
-                {columnVisibility.type && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'type')}>Type</th>
-                )}
-                {columnVisibility.budget && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'budget')}>Budget</th>
-                )}
-                {columnVisibility.duration && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'duration')}>Duration</th>
-                )}
-                {columnVisibility.startDate && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'startDate')}>Start Date</th>
-                )}
-                {columnVisibility.finishDate && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'finishDate')}>Finish Date</th>
-                )}
-                {columnVisibility.progress && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'progress')}>Progress</th>
-                )}
-              </>
+            {columnVisibility.description && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'description')}>Description</th>
             )}
-            {view === 'details' && (
-              <>
-                {columnVisibility.budget && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'budget')}>Budget</th>
-                )}
-                {columnVisibility.role1 && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'role1')}>Role1</th>
-                )}
-                {columnVisibility.role2 && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'role2')}>Role2</th>
-                )}
-                {columnVisibility.predecessors && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'predecessors')}>Predecessors</th>
-                )}
-                {columnVisibility.lag && (
-                  <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'lag')}>Lag</th>
-                )}
-              </>
+            {columnVisibility.type && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'type')}>Type</th>
+            )}
+            {columnVisibility.plannedDuration && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'plannedDuration')}>Planned<br/>Duration</th>
+            )}
+            {columnVisibility.startDate && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'startDate')}>Start Date</th>
+            )}
+            {columnVisibility.finishDate && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'finishDate')}>Finish Date</th>
+            )}
+            {columnVisibility.predecessor && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'predecessor')}>Predecessor</th>
+            )}
+            {columnVisibility.successor && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'successor')}>Successor</th>
+            )}
+            {columnVisibility.remainingDuration && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'remainingDuration')}>Remaining<br/>Duration</th>
+            )}
+            {columnVisibility.baselineStartDate && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'baselineStartDate')}>Baseline<br/>Start Date</th>
+            )}
+            {columnVisibility.baselineFinishDate && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'baselineFinishDate')}>Baseline<br/>Finish Date</th>
+            )}
+            {columnVisibility.accountableOrganization && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'accountableOrganization')}>Accountable<br/>Organization</th>
+            )}
+            {columnVisibility.responsiblePersonnel && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'responsiblePersonnel')}>Responsible<br/>Personnel</th>
+            )}
+            {columnVisibility.projectManager && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'projectManager')}>Project<br/>Manager</th>
+            )}
+            {columnVisibility.flag && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'flag')}>Flag</th>
+            )}
+            {columnVisibility.reasoning && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'reasoning')}>Reasoning</th>
+            )}
+            {columnVisibility.juniorDesign && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'juniorDesign')}>Junior<br/>Design</th>
+            )}
+            {columnVisibility.intermediateDesign && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'intermediateDesign')}>Intermediate<br/>Design</th>
+            )}
+            {columnVisibility.seniorDesign && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'seniorDesign')}>Senior<br/>Design</th>
+            )}
+            {columnVisibility.budget && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'budget')}>Budget</th>
+            )}
+            {columnVisibility.progress && (
+              <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'progress')}>Progress</th>
             )}
           </tr>
         </thead>
@@ -1117,14 +1325,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 title={task.isHeader ? undefined : "Click to view dependencies"}
               >
                 {/* Task Name with WBS */}
-                <td className={cell}>
+                <td className="align-middle py-3 px-3 border border-gray-200 text-left">
                   <div className="flex items-start gap-2">
-                    {/* Indent text according to depth; Chevron floats in gutter */}
                     <div
-                      style={{ paddingLeft: `${getIndentationLevel(task.wbsPath || task.wbsCode || '') * 1.25}rem` }}
-                      className="relative flex-1"
+                      style={{ paddingLeft: `${(getIndentationLevel(task.wbsPath || task.wbsCode || '') * 1.25) + 1}rem` }}
+                      className="relative flex-1 min-w-0"
                     >
-                      {/* Chevron for collapsible parents */}
                       {allTasks.some(t => t.parentId === task.id) && (
                         <ChevronRight
                           className={`absolute -ml-4 h-4 w-4 cursor-pointer transition-transform text-gray-400 ${
@@ -1137,15 +1343,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         />
                       )}
                       
-                      <div className="flex flex-col gap-0.5">
+                      <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           {showWbs && (
-                            <span className={`text-sm font-mono font-semibold px-1.5 py-0.5 rounded ${getWbsTextColor(task.wbsPath || task.wbsCode || '')}`}>
+                            <span className={`text-xs font-mono font-semibold px-2 py-1 rounded whitespace-nowrap ${getWbsTextColor(task.wbsPath || task.wbsCode || '')}`}>
                               {formatWbsCode(task.wbsPath || task.wbsCode || '')}
                             </span>
                           )}
                         </div>
-                        <span className={`text-base font-medium leading-tight ${getTaskNameTextColor(task.wbsPath || task.wbsCode || '')}`}>
+                        <span className={`text-sm font-medium leading-tight truncate ${getTaskNameTextColor(task.wbsPath || task.wbsCode || '')}`}
+                              title={task.title || task.name}>
                           {task.title || task.name}
                         </span>
                       </div>
@@ -1153,148 +1360,267 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   </div>
                 </td>
 
-                {/* Activity ID – blank for headers */}
+                {/* Level */}
+                {columnVisibility.level && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-sm font-medium text-gray-600">
+                      {getWbsLevel(task.wbsPath || task.wbsCode || '')}
+                    </span>
+                  </td>
+                )}
+
+                {/* Activity ID */}
                 {columnVisibility.id && (
-                  <td className={cell}>
+                  <td className={`${cell} text-center`}>
                     {task.isHeader ? (
                       <span className="text-sm text-gray-400">-</span>
                     ) : (
-                      <span className="text-sm font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-xs font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
                         {task.activityId}
                       </span>
                     )}
                   </td>
                 )}
 
-                {view === 'schedule' ? (
-                  <>
-                    {columnVisibility.type && (
-                      <td className={cell}>
-                        {task.isMilestone ? (
-                          <span className="text-gray-600 text-sm">Milestone</span>
-                        ) : task.isHeader ? (
-                          <span className="text-gray-600 text-sm">Header</span>
-                        ) : (
-                          <span className="text-gray-600 text-sm">Activity</span>
-                        )}
-                      </td>
-                    )}
-                    {columnVisibility.budget && (
-                      <td className={cell}>
-                        {canEditBudget(task) ? (
-                          <BudgetCell
-                            value={task.totalCost || 0}
-                            onChange={(value) => handleBudgetChange(task.id, value)}
-                            rollupValue={task.totalCost || 0}
-                            isRollup={!canEditBudget(task)}
-                          />
-                        ) : (
-                          <span className="text-gray-600 text-sm">
-                            {formatCurrency(task.totalCost || 0)}
-                          </span>
-                        )}
-                      </td>
-                    )}
-                    {columnVisibility.duration && (
-                      <td className={cell}>
-                        <span className="text-sm">
-                          {task.duration}d
-                        </span>
-                      </td>
-                    )}
-                    {columnVisibility.startDate && (
-                      <td className={cell}>
-                        <DatePickerCell
-                          value={task.startDate}
-                          onChange={(date) => onUpdateTask(task.id, { startDate: date })}
-                        />
-                      </td>
-                    )}
-                    {columnVisibility.finishDate && (
-                      <td className={cell}>
-                        <DatePickerCell
-                          value={task.endDate}
-                          onChange={(date) => onUpdateTask(task.id, { endDate: date })}
-                        />
-                      </td>
-                    )}
-                    {columnVisibility.progress && (
-                      <td className={cell}>
-                        <div className="flex items-center gap-1 justify-center">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={(task.progress ?? 0).toString()}
-                            onChange={(e) => {
-                              const cleaned = e.target.value.replace(/[^0-9]/g, '')
-                              const num = Math.max(0, Math.min(100, parseInt(cleaned || '0')))
-                              onUpdateTask(task.id, { progress: num })
-                            }}
-                            className="w-8 px-0.5 py-0.5 text-sm border rounded text-center appearance-none"
-                          />
-                          <span className="text-sm text-gray-500">%</span>
-                        </div>
-                      </td>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {columnVisibility.budget && (
-                      <td className={cell}>
+                {/* Description */}
+                {columnVisibility.description && (
+                  <td className={`${cell} text-left`}>
+                    <span className="text-sm text-gray-600 truncate block" title={task.description || ''}>
+                      {task.description || '-'}
+                    </span>
+                  </td>
+                )}
+
+                {/* Type */}
+                {columnVisibility.type && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
+                      {task.isMilestone ? 'Milestone' : task.isHeader ? 'WBS Header' : 'Activity'}
+                    </span>
+                  </td>
+                )}
+
+                {/* Planned Duration */}
+                {columnVisibility.plannedDuration && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-sm font-medium">
+                      {task.duration}d
+                    </span>
+                  </td>
+                )}
+
+                {/* Start Date */}
+                {columnVisibility.startDate && (
+                  <td className={`${cell} text-center`}>
+                    <DatePickerCell
+                      value={task.startDate}
+                      onChange={(date) => onUpdateTask(task.id, { startDate: date })}
+                    />
+                  </td>
+                )}
+
+                {/* Finish Date */}
+                {columnVisibility.finishDate && (
+                  <td className={`${cell} text-center`}>
+                    <DatePickerCell
+                      value={task.endDate}
+                      onChange={(date) => onUpdateTask(task.id, { endDate: date })}
+                    />
+                  </td>
+                )}
+
+                {/* Predecessor */}
+                {columnVisibility.predecessor && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-xs text-gray-600 font-mono truncate block" title={task.predecessors?.map(p => p.predecessor.activityId).join(', ') || ''}>
+                      {task.predecessors?.map(p => p.predecessor.activityId).join(', ') || '-'}
+                    </span>
+                  </td>
+                )}
+
+                {/* Successor */}
+                {columnVisibility.successor && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-xs text-gray-600 font-mono truncate block" title={task.successors?.map(s => s.successor.activityId).join(', ') || ''}>
+                      {task.successors?.map(s => s.successor.activityId).join(', ') || '-'}
+                    </span>
+                  </td>
+                )}
+
+                {/* Remaining Duration */}
+                {columnVisibility.remainingDuration && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-sm font-medium">
+                      {Math.max(0, (task.duration || 0) - Math.floor(((task.progress || 0) / 100) * (task.duration || 0)))}d
+                    </span>
+                  </td>
+                )}
+
+                {/* Baseline Start Date */}
+                {columnVisibility.baselineStartDate && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-sm text-gray-500">
+                      {task.baselineStartDate ? formatDate(task.baselineStartDate) : '-'}
+                    </span>
+                  </td>
+                )}
+
+                {/* Baseline Finish Date */}
+                {columnVisibility.baselineFinishDate && (
+                  <td className={`${cell} text-center`}>
+                    <span className="text-sm text-gray-500">
+                      {task.baselineFinishDate ? formatDate(task.baselineFinishDate) : '-'}
+                    </span>
+                  </td>
+                )}
+
+                {/* Accountable Organization */}
+                {columnVisibility.accountableOrganization && (
+                  <td className={`${cell} text-center`}>
+                    <input
+                      type="text"
+                      value={task.accountableOrganization || ''}
+                      onChange={(e) => onUpdateTask(task.id, { accountableOrganization: e.target.value })}
+                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Organization"
+                    />
+                  </td>
+                )}
+
+                {/* Responsible Personnel */}
+                {columnVisibility.responsiblePersonnel && (
+                  <td className={`${cell} text-center`}>
+                    <input
+                      type="text"
+                      value={task.responsiblePersonnel || ''}
+                      onChange={(e) => onUpdateTask(task.id, { responsiblePersonnel: e.target.value })}
+                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Personnel"
+                    />
+                  </td>
+                )}
+
+                {/* Project Manager */}
+                {columnVisibility.projectManager && (
+                  <td className={`${cell} text-center`}>
+                    <input
+                      type="text"
+                      value={task.projectManager || ''}
+                      onChange={(e) => onUpdateTask(task.id, { projectManager: e.target.value })}
+                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="PM"
+                    />
+                  </td>
+                )}
+
+                {/* Flag */}
+                {columnVisibility.flag && (
+                  <td className={`${cell} text-center`}>
+                    <input
+                      type="text"
+                      value={task.flag || ''}
+                      onChange={(e) => onUpdateTask(task.id, { flag: e.target.value })}
+                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Flag"
+                    />
+                  </td>
+                )}
+
+                {/* Reasoning */}
+                {columnVisibility.reasoning && (
+                  <td className={`${cell} text-left`}>
+                    <input
+                      type="text"
+                      value={task.reasoning || ''}
+                      onChange={(e) => onUpdateTask(task.id, { reasoning: e.target.value })}
+                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Reasoning"
+                    />
+                  </td>
+                )}
+
+                {/* Junior Design */}
+                {columnVisibility.juniorDesign && (
+                  <td className={`${cell} text-center`}>
+                    <input
+                      type="number"
+                      value={task.juniorDesign || ''}
+                      onChange={(e) => onUpdateTask(task.id, { juniorDesign: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-2 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0"
+                      min="0"
+                      step="0.1"
+                    />
+                  </td>
+                )}
+
+                {/* Intermediate Design */}
+                {columnVisibility.intermediateDesign && (
+                  <td className={`${cell} text-center`}>
+                    <input
+                      type="number"
+                      value={task.intermediateDesign || ''}
+                      onChange={(e) => onUpdateTask(task.id, { intermediateDesign: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-2 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0"
+                      min="0"
+                      step="0.1"
+                    />
+                  </td>
+                )}
+
+                {/* Senior Design */}
+                {columnVisibility.seniorDesign && (
+                  <td className={`${cell} text-center`}>
+                    <input
+                      type="number"
+                      value={task.seniorDesign || ''}
+                      onChange={(e) => onUpdateTask(task.id, { seniorDesign: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-2 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0"
+                      min="0"
+                      step="0.1"
+                    />
+                  </td>
+                )}
+
+                {/* Budget */}
+                {columnVisibility.budget && (
+                  <td className={`${cell} text-center`}>
+                    {canEditBudget(task) ? (
+                      <BudgetCell
+                        value={task.totalCost || 0}
+                        onChange={(value) => handleBudgetChange(task.id, value)}
+                        rollupValue={task.totalCost || 0}
+                        isRollup={!canEditBudget(task)}
+                      />
+                    ) : (
+                      <span className="text-sm font-medium text-gray-600">
                         {formatCurrency(task.totalCost || 0)}
-                      </td>
+                      </span>
                     )}
-                    {columnVisibility.role1 && (
-                      <td className={cell}>
-                        {canEditResourceLoading(task) ? (
-                          <input
-                            type="text"
-                            value={task.resourceRole || ''}
-                            onChange={(e) =>
-                              onUpdateTask(task.id, { resourceRole: e.target.value })
-                            }
-                            className="w-full px-1 py-0.5 text-sm border rounded"
-                            placeholder="Role"
-                          />
-                        ) : (
-                          <span className="text-gray-400 text-sm">-</span>
-                        )}
-                      </td>
-                    )}
-                    {columnVisibility.role2 && (
-                      <td className={cell}>
-                        {canEditResourceLoading(task) ? (
-                          <input
-                            type="text"
-                            value={task.resourceRole2 || ''}
-                            onChange={(e) =>
-                              onUpdateTask(task.id, { resourceRole2: e.target.value })
-                            }
-                            className="w-full px-1 py-0.5 text-sm border rounded"
-                            placeholder="Role 2"
-                          />
-                        ) : (
-                          <span className="text-gray-400 text-sm">-</span>
-                        )}
-                      </td>
-                    )}
-                    {columnVisibility.predecessors && (
-                      <td className={cell}>
-                        <span className="text-sm text-gray-600 font-mono">
-                          {task.predecessors?.map(p => p.predecessor.activityId).join(', ') || '-'}
-                        </span>
-                      </td>
-                    )}
-                    {columnVisibility.lag && (
-                      <td className={cell}>
-                        <LagInput
-                          value={task.lag || 0}
-                          onChange={(lag) => onUpdateTask(task.id, { lag })}
-                        />
-                      </td>
-                    )}
-                  </>
+                  </td>
+                )}
+
+                {/* Progress % */}
+                {columnVisibility.progress && (
+                  <td className={`${cell} text-center`}>
+                    <div className="flex items-center justify-center gap-1">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={(task.progress ?? 0).toString()}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/[^0-9]/g, '')
+                          const num = Math.max(0, Math.min(100, parseInt(cleaned || '0')))
+                          onUpdateTask(task.id, { progress: num })
+                        }}
+                        className="w-12 px-1 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <span className="text-sm text-gray-500">%</span>
+                    </div>
+                  </td>
                 )}
               </tr>
               {newRowState.isAdding && newRowState.afterTaskId === task.id && renderNewRow()}

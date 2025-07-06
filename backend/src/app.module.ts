@@ -7,6 +7,8 @@ import { RelationsModule } from './modules/relations/relations.module';
 import { P6ImportModule } from './modules/p6-import/p6-import.module';
 import { PortfolioModule } from './modules/portfolio/portfolio.module';
 import { DependenciesModule } from './modules/dependencies/dependencies.module';
+import { ResourcesModule } from './modules/resources/resources.module';
+import { ResourceAssignmentsModule } from './modules/resource-assignments/resource-assignments.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { DependenciesModule } from './modules/dependencies/dependencies.module';
     P6ImportModule,
     PortfolioModule,
     DependenciesModule,
+    ResourcesModule,
+    ResourceAssignmentsModule,
   ],
 })
 export class AppModule {} 

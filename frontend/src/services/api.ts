@@ -1,15 +1,18 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+  baseURL: 'http://localhost:3000',
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
-// Request interceptor to add auth token
+// Add request interceptor for better error handling
 api.interceptors.request.use(
   (config) => {
+    // Add auth token if available
     const token = localStorage.getItem('authToken')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -29,15 +32,21 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor to handle auth errors
+// Add response interceptor for better error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle CORS and network errors more gracefully
+    if (error.code === 'ERR_NETWORK' || error.message.includes('CORS')) {
+      console.warn('Network/CORS error - this is usually temporary during development')
+    }
+    
+    // Handle 401 errors by clearing auth
     if (error.response?.status === 401) {
       localStorage.removeItem('authToken')
-      // Don't force a page reload - let React Router handle navigation
-      // The AuthContext will redirect to login when it detects no valid token
+      delete api.defaults.headers.common['Authorization']
     }
+    
     return Promise.reject(error)
   }
 )

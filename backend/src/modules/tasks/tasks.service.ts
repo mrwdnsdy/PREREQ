@@ -12,90 +12,55 @@ export class TasksService {
     private authService: AuthService,
   ) {}
 
-  // Generate unique Activity ID with meaningful naming
-  private async generateUniqueActivityId(projectId?: string, level?: number): Promise<string> {
-    const maxRetries = 5;
-    
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        let activityId: string;
-        
-        if (projectId && level !== undefined) {
-          // Get project info for meaningful naming
-          const project = await this.prisma.project.findUnique({
-            where: { id: projectId },
-            select: { name: true }
-          });
-          
-          if (project) {
-            // Create project prefix from first 2-3 letters of project name
-            const projectPrefix = project.name
-              .toUpperCase()
-              .replace(/[^A-Z]/g, '')
-              .substring(0, 3)
-              .padEnd(3, 'X');
-            
-            // Generate level-based suffix
-            let suffix: string;
-            if (level <= 2) {
-              // High level tasks: PRJ-100, PRJ-200, etc.
-              const existingHighLevel = await this.prisma.task.findMany({
-                where: { 
-                  projectId,
-                  level: { lte: 2 },
-                  activityId: { startsWith: projectPrefix }
-                },
-                select: { activityId: true },
-                orderBy: { activityId: 'desc' }
-              });
-              
-              let nextNumber = 100;
-              if (existingHighLevel.length > 0) {
-                const lastId = existingHighLevel[0].activityId;
-                const match = lastId.match(/(\d+)$/);
-                if (match) {
-                  nextNumber = Math.max(100, parseInt(match[1]) + 100);
-                }
-              }
-              suffix = nextNumber.toString();
-            } else {
-              // Lower level tasks: use timestamp-based for now to avoid complexity
-              suffix = `${level}${Date.now().toString().slice(-4)}`;
-            }
-            
-            activityId = `${projectPrefix}-${suffix}`;
-          } else {
-            // Fallback if project not found
-            activityId = `TSK-${Date.now().toString().slice(-6)}-${attempt}`;
-          }
-        } else {
-          // Fallback for calls without context
-          activityId = `TSK-${Date.now().toString().slice(-6)}-${attempt}`;
-        }
+  /**
+   * Generate a sequential Activity ID in the classic "A####" format.
+   *   A0001, A0002, A0003 … – unique **within the project**.
+   * We keep the logic very simple:
+   *   1. Look up the task with the highest numeric suffix for this project.
+   *   2. Increment by 1 and left-pad to 4 digits.
+   *   3. Prepend the constant prefix "A".
+   *
+   * The level parameter is no longer used for ID generation, but we keep it in
+   * the signature to avoid changing the many call-sites.  Future improvements
+   * could decide to vary the length based on level, but for now we stick to the
+   * legacy behaviour the UI expects.
+   */
+  private async generateUniqueActivityId(projectId?: string, _level?: number): Promise<string> {
+    if (!projectId) {
+      // Should never happen, but fall back to timestamp-based value.
+      return `A${Date.now().toString().slice(-4)}`;
+    }
 
-        // Verify this ID doesn't already exist
-        const existingTask = await this.prisma.task.findFirst({
-          where: { activityId },
-          select: { id: true }
-        });
+    // Get the highest existing numeric part for IDs that match the pattern "A####".
+    const lastTask = await this.prisma.task.findFirst({
+      where: {
+        projectId,
+        activityId: {
+          startsWith: 'A',
+          mode: 'insensitive',
+        },
+        // Make sure the suffix is numeric – use regex for stricter matching.
+        // Prisma doesn't support full regex filters, so we'll sort and parse later.
+      },
+      orderBy: {
+        activityId: 'desc',
+      },
+      select: {
+        activityId: true,
+      },
+    });
 
-        if (!existingTask) {
-          return activityId;
-        }
-
-        // If ID exists, will retry with incremented attempt
-      } catch (error) {
-        console.warn(`Activity ID generation attempt ${attempt + 1} failed:`, error);
-        if (attempt === maxRetries - 1) {
-          // Final fallback
-          const prefix = projectId ? 'ERR' : 'TSK';
-          return `${prefix}-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-        }
+    let nextNumber = 1;
+    if (lastTask?.activityId) {
+      const numericPart = parseInt(lastTask.activityId.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(numericPart)) {
+        nextNumber = numericPart + 1;
       }
     }
 
-    // Final fallback
-    return `TSK-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+    // Left-pad to at least 4 digits (A0001 → A9999, then A10000, etc.)
+    const padded = nextNumber.toString().padStart(4, '0');
+    return `A${padded}`;
   }
 
   private calculateLevel(parentId: string | null, projectId: string): Promise<number> {
@@ -276,7 +241,14 @@ export class TasksService {
   }
 
   // Recursively calculate and update budget rollups for a task and its ancestors
-  private async updateBudgetRollups(taskId: string): Promise<void> {
+  private async updateBudgetRollups(taskId: string, visitedTasks: Set<string> = new Set()): Promise<void> {
+    // Prevent infinite recursion
+    if (visitedTasks.has(taskId)) {
+      console.warn(`Circular reference detected in task hierarchy: ${taskId}`);
+      return;
+    }
+    visitedTasks.add(taskId);
+
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: {
@@ -287,45 +259,54 @@ export class TasksService {
 
     if (!task) return;
 
-    // Calculate total cost for this task
+    // --- DEPTH-FIRST: update all children first so their totals are fresh ---
+    if (task.children.length > 0) {
+      for (const child of task.children) {
+        await this.updateBudgetRollups(child.id, new Set(visitedTasks));
+      }
+    }
+
+    // Now calculate (or recalculate) total cost for this task
     let totalCost = new Decimal(0);
 
-    // If this is a leaf task (no children), use direct costs
     if (task.children.length === 0) {
+      // Leaf – use its own direct costs
       totalCost = this.calculateDirectCost(
         Number(task.costLabor),
         Number(task.costMaterial),
-        Number(task.costOther)
+        Number(task.costOther),
       );
     } else {
-      // If this has children, sum up their total costs
-      const childTasks = await this.prisma.task.findMany({
+      // Parent – sum freshly updated child totals
+      const childTotals = await this.prisma.task.findMany({
         where: { parentId: taskId },
         select: { totalCost: true },
       });
 
-      totalCost = childTasks.reduce((sum, child) => {
-        return sum.plus(new Decimal(child.totalCost.toString()));
-      }, new Decimal(0));
+      totalCost = childTotals.reduce((sum, child) =>
+        sum.plus(new Decimal(child.totalCost.toString())), new Decimal(0));
     }
 
-    // Update this task's total cost
-    await this.prisma.task.update({
-      where: { id: taskId },
-      data: { totalCost },
-    });
-
-    // Update project-level budget rollup if this is the root task (level 0)
-    if (task.level === 0) {
-      await this.prisma.project.update({
-        where: { id: task.projectId },
-        data: { budgetRollup: totalCost },
+    // Only update if the total cost has actually changed
+    const currentTotalCost = new Decimal(task.totalCost.toString());
+    if (!totalCost.equals(currentTotalCost)) {
+      await this.prisma.task.update({
+        where: { id: taskId },
+        data: { totalCost },
       });
-    }
 
-    // Recursively update parent if it exists
-    if (task.parentId) {
-      await this.updateBudgetRollups(task.parentId);
+      // Update project-level budget rollup if this is the root task (level 0)
+      if (task.level === 0) {
+        await this.prisma.project.update({
+          where: { id: task.projectId },
+          data: { budgetRollup: totalCost },
+        });
+      }
+
+      // Recursively update parent if it exists (only if we actually changed something)
+      if (task.parentId) {
+        await this.updateBudgetRollups(task.parentId, new Set(visitedTasks));
+      }
     }
   }
 

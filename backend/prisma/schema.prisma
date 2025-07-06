@@ -63,9 +63,10 @@ model Task {
   predecessors     TaskRelation[]   @relation("predecessors")
   parent           Task?            @relation("TaskHierarchy", fields: [parentId], references: [id])
   children         Task[]           @relation("TaskHierarchy")
-  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  dependenciesFrom TaskDependency[] @relation("DependencyPredecessor")
-  dependenciesTo   TaskDependency[] @relation("DependencySuccessor")
+  project          Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dependenciesFrom TaskDependency[]    @relation("DependencyPredecessor")
+  dependenciesTo   TaskDependency[]    @relation("DependencySuccessor")
+  resourceAssignments ResourceAssignment[]
 
   @@unique([projectId, wbsCode])
   @@index([projectId])
@@ -120,6 +121,46 @@ model TaskDependency {
   @@index([predecessorId])
   @@index([successorId])
   @@map("task_dependencies")
+}
+
+model ResourceType {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  resources Resource[]
+
+  @@map("resource_types")
+}
+
+model Resource {
+  id          String               @id @default(cuid())
+  name        String
+  rateFloat   Float                @map("rate_float")
+  typeId      String               @map("type_id")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+  type        ResourceType         @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  assignments ResourceAssignment[]
+
+  @@index([typeId])
+  @@map("resources")
+}
+
+model ResourceAssignment {
+  id         String   @id @default(cuid())
+  taskId     String   @map("task_id")
+  resourceId String   @map("resource_id")
+  hours      Int
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, resourceId])
+  @@index([taskId])
+  @@index([resourceId])
+  @@map("resource_assignments")
 }
 
 enum RelationType {

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, FolderOpen, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
+import toast from 'react-hot-toast'
 
 interface ProjectMember {
   id: string
@@ -81,21 +82,27 @@ const Projects = () => {
     }
   }
 
-  const handleDeleteProject = async (projectId: string) => {
-    if (!window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      return
-    }
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
+    setShowDeleteConfirm(projectId)
+  }
 
+  const confirmDelete = async (projectId: string) => {
     try {
       setDeletingProjectId(projectId)
+      setShowDeleteConfirm(null)
       await api.delete(`/projects/${projectId}`)
       setProjects(projects.filter(p => p.id !== projectId))
+      toast.success('Project deleted successfully')
     } catch (err: any) {
       console.error('Error deleting project:', err)
-      alert('Failed to delete project: ' + (err.message || 'Unknown error'))
+      toast.error('Failed to delete project: ' + (err.response?.data?.message || err.message || 'Unknown error'))
     } finally {
       setDeletingProjectId(null)
     }
+  }
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(null)
   }
 
   if (!user) {
@@ -189,34 +196,45 @@ const Projects = () => {
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => {
               const userMember = project.members?.find(m => m.user.id === user?.id)
-              const canDelete = userMember?.role === 'OWNER'
+              // Show delete button for all users for now to test visibility
+              const canDelete = true // userMember?.role === 'OWNER' || userMember?.role === 'ADMIN'
+              const hasPermission = userMember?.role === 'OWNER' || userMember?.role === 'ADMIN'
 
               return (
                 <div
                   key={project.id}
                   className="relative rounded-lg border border-gray-200 bg-white shadow-sm hover:border-gray-300 hover:shadow-md transition-all"
                 >
-                  {canDelete && (
+                  {/* Delete Button - More visible with background */}
+                  <div className="absolute top-3 right-3 z-10">
                     <button
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
-                        handleDeleteProject(project.id)
+                        if (hasPermission) {
+                          handleDeleteProject(project.id, project.name)
+                        } else {
+                          toast.error('You do not have permission to delete this project')
+                        }
                       }}
                       disabled={deletingProjectId === project.id}
-                      className="absolute top-4 right-4 text-red-400 hover:text-red-600 p-1 rounded transition-colors disabled:opacity-50 z-10"
-                      title="Delete project"
+                      className={`p-2 rounded-full border shadow-sm transition-all ${
+                        hasPermission 
+                          ? 'text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 bg-white' 
+                          : 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
+                      } disabled:opacity-50`}
+                      title={hasPermission ? "Delete project" : "No permission to delete"}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
-                  )}
+                  </div>
 
                   <Link 
                     to={`/projects/${project.id}`}
                     className="block p-6 h-full"
                   >
                     <div className="flex items-start justify-between">
-                      <div className="min-w-0 flex-1 mr-8">
+                      <div className="min-w-0 flex-1 mr-12">
                         <h3 className="text-lg font-medium text-gray-900 truncate">
                           {project.name}
                         </h3>
@@ -248,6 +266,41 @@ const Projects = () => {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="mt-3 text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                  <Trash2 className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mt-4">Delete Project</h3>
+                <div className="mt-2 px-7 py-3">
+                  <p className="text-sm text-gray-500">
+                    Are you sure you want to delete this project? This action cannot be undone and will permanently remove all project data including tasks, dependencies, and resources.
+                  </p>
+                </div>
+                <div className="items-center px-4 py-3">
+                  <button
+                    onClick={() => confirmDelete(showDeleteConfirm)}
+                    disabled={deletingProjectId === showDeleteConfirm}
+                    className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-24 mr-2 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-50"
+                  >
+                    {deletingProjectId === showDeleteConfirm ? 'Deleting...' : 'Delete'}
+                  </button>
+                  <button
+                    onClick={cancelDelete}
+                    disabled={deletingProjectId === showDeleteConfirm}
+                    className="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md w-24 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
