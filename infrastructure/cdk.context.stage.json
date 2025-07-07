@@ -1,0 +1,6 @@
+{
+  "env": "stage",
+  "rootDomain": "<ROOT_DOMAIN>",          // "prereq.ca"
+  "subDomain": "staging",
+  "certArn": "arn:aws:acm:us-east-1:911167926050:certificate/12c0c44a-b495-46af-b86d-381df366bf44"
+}
