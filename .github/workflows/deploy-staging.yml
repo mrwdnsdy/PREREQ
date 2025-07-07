@@ -1,0 +1,49 @@
+name: Deploy Staging
+on:
+  push:
+    branches: [ staging ]
+
+permissions:
+  id-token: write      # needed for OIDC
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1 – Checkout repo
+      - uses: actions/checkout@v4
+
+      # 2 – Assume the GitHub-OIDC role
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # 3 – Build the React front-end
+      - name: Build front-end
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      # 4 – Sync static site to the staging bucket
+      #     ⚠️ Replace BUCKET_NAME if your CDK stack uses a different bucket id
+      - name: Upload to S3
+        run: |
+          aws s3 sync frontend/dist s3://prereq-frontend-stage-${{ env.AWS_ACCOUNT_ID }}-us-east-1 --delete
+
+      # 5 – Deploy / update infrastructure (CDK)
+      - name: Install infra deps
+        run: |
+          cd infrastructure
+          npm ci
+
+      - name: CDK deploy (stage)
+        run: |
+          npx cdk deploy --all --require-approval never \
+            -c env=stage \
+            -c rootDomain=${{ secrets.ROOT_DOMAIN }} \
+            -c subDomain=staging \
+            -c certArn=${{ secrets.CERT_ARN }} 
