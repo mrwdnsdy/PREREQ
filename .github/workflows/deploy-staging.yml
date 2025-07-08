@@ -69,6 +69,7 @@ jobs:
         working-directory: ./backend
         run: |
           npm install
+          npx prisma generate
           npm run build
 
       # 7 – Install infrastructure dependencies  
