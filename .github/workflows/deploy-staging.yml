@@ -34,37 +34,7 @@ jobs:
           npm install
           npm run build
 
-      # 5 – Create S3 bucket if it doesn't exist
-      - name: Create S3 bucket
-        run: |
-          BUCKET_NAME="prereq-frontend-stage-$AWS_ACCOUNT_ID-us-east-1"
-          
-          # Check if bucket exists
-          if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
-            echo "Creating S3 bucket: $BUCKET_NAME"
-            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-1
-            
-            # Enable versioning
-            aws s3api put-bucket-versioning --bucket "$BUCKET_NAME" --versioning-configuration Status=Enabled
-            
-            # Configure bucket for static website hosting
-            aws s3api put-bucket-website --bucket "$BUCKET_NAME" --website-configuration file://<(cat <<EOF
-          {
-            "IndexDocument": {"Suffix": "index.html"},
-            "ErrorDocument": {"Key": "index.html"}
-          }
-          EOF
-          )
-          else
-            echo "S3 bucket $BUCKET_NAME already exists"
-          fi
-
-      # 6 – Upload to S3
-      - name: Upload to S3
-        run: |
-          aws s3 sync frontend/dist s3://prereq-frontend-stage-$AWS_ACCOUNT_ID-us-east-1 --delete
-
-      # 6 – Build backend (NestJS)
+      # 5 – Build backend (NestJS)
       - name: Build backend
         working-directory: ./backend
         run: |
