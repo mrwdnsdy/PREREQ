@@ -323,4 +323,4 @@ For support and questions:
 
 ---
 
-**Built with ❤️ using modern web technologies** 
+**Built with ❤️ using modern web technologies** # AWS deployment configured with GitHub secrets
