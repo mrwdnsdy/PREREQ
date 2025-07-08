@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDependencyDto } from './dto/create-dependency.dto';
 import { UpdateDependencyDto } from './dto/update-dependency.dto';
-import { Prisma } from '@prisma/client';
+import { TaskDependency } from '@prisma/client';
 
 @Injectable()
 export class DependenciesService {
@@ -11,7 +11,7 @@ export class DependenciesService {
   /**
    * Create a new task dependency with validation
    */
-  async create(createDependencyDto: CreateDependencyDto): Promise<Prisma.TaskDependency> {
+  async create(createDependencyDto: CreateDependencyDto): Promise<TaskDependency> {
     const { predecessorId, successorId, type, lag } = createDependencyDto;
 
     // Check for self-link (same task as predecessor and successor)
@@ -56,7 +56,7 @@ export class DependenciesService {
   /**
    * Find all dependencies with optional filtering
    */
-  async findAll(projectId?: string): Promise<Prisma.TaskDependency[]> {
+  async findAll(projectId?: string): Promise<TaskDependency[]> {
     const whereClause = projectId ? {
       predecessor: { projectId },
       successor: { projectId }
@@ -83,8 +83,8 @@ export class DependenciesService {
    * Find dependencies for a specific task (both as predecessor and successor)
    */
   async findByTaskId(taskId: string): Promise<{
-    asPredecessor: Prisma.TaskDependency[];
-    asSuccessor: Prisma.TaskDependency[];
+    asPredecessor: TaskDependency[];
+    asSuccessor: TaskDependency[];
   }> {
     const [asPredecessor, asSuccessor] = await Promise.all([
       this.prisma.taskDependency.findMany({
@@ -111,7 +111,7 @@ export class DependenciesService {
   /**
    * Find a single dependency by ID
    */
-  async findOne(id: string): Promise<Prisma.TaskDependency> {
+  async findOne(id: string): Promise<TaskDependency> {
     const dependency = await this.prisma.taskDependency.findUnique({
       where: { id },
       include: {
@@ -134,7 +134,7 @@ export class DependenciesService {
   /**
    * Update a dependency (only type and lag can be updated)
    */
-  async update(id: string, updateDependencyDto: UpdateDependencyDto): Promise<Prisma.TaskDependency> {
+  async update(id: string, updateDependencyDto: UpdateDependencyDto): Promise<TaskDependency> {
     // Verify dependency exists
     await this.findOne(id);
 
@@ -155,7 +155,7 @@ export class DependenciesService {
   /**
    * Remove a dependency
    */
-  async remove(id: string): Promise<Prisma.TaskDependency> {
+  async remove(id: string): Promise<TaskDependency> {
     // Verify dependency exists
     await this.findOne(id);
 
