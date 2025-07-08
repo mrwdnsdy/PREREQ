@@ -66,9 +66,8 @@ jobs:
 
       # 7 – Deploy / update infrastructure (CDK)
       - name: Install infra deps
-        run: |
-          cd infrastructure
-          npm ci
+        working-directory: ./infrastructure
+        run: npm install
 
       - name: CDK deploy (stage)
         run: |
