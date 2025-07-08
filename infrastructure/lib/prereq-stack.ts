@@ -12,6 +12,9 @@ import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
+import * as acm     from 'aws-cdk-lib/aws-certificatemanager';
 import { Construct } from 'constructs';
 
 export class PrereqStack extends cdk.Stack {
@@ -438,7 +441,37 @@ export class PrereqStack extends cdk.Stack {
           ttl: cdk.Duration.seconds(0), // No caching for SPA routes
         },
       ],
+      // Add domain configuration if provided
+      ...(this.node.tryGetContext('rootDomain') && this.node.tryGetContext('subDomain') && this.node.tryGetContext('certArn') ? {
+        domainNames: [`${this.node.tryGetContext('subDomain')}.${this.node.tryGetContext('rootDomain')}`],
+        certificate: acm.Certificate.fromCertificateArn(
+          this, 'DistributionCert', 
+          this.node.tryGetContext('certArn')
+        ),
+      } : {}),
     });
+
+    /* ---------- Stage domain wiring ---------- */
+    const rootDomain = this.node.tryGetContext('rootDomain');
+    const subDomain  = this.node.tryGetContext('subDomain');
+    const certArn    = this.node.tryGetContext('certArn');
+
+    if (rootDomain && subDomain && certArn) {
+      // Hosted zone lookup
+      const zone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+        domainName: rootDomain,
+      });
+
+      // Route 53 A-alias → CloudFront
+      new route53.ARecord(this, 'StageAlias', {
+        recordName: subDomain,
+        zone,
+        target: route53.RecordTarget.fromAlias(
+          new targets.CloudFrontTarget(distribution),
+        ),
+      });
+    }
+    /* ----------------------------------------- */
 
     // Store sensitive values in SSM Parameters
     new ssm.StringParameter(this, 'DatabaseEndpointParam', {
