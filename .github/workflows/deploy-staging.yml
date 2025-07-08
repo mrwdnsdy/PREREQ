@@ -61,3 +61,18 @@ jobs:
             -c rootDomain=prereq.ca \
             -c subDomain=staging \
             -c certArn=arn:aws:acm:us-east-1:911167926050:certificate/12c0c44a-b495-46af-b86d-381df366bf44 
+
+      # 9 - Sync frontend build to S3
+      - name: Deploy frontend to S3
+        run: |
+          aws s3 sync frontend/dist/ s3://prereq-frontend-stage-${{ env.AWS_ACCOUNT_ID }}-us-east-1/ --delete
+          
+      # 10 - Invalidate CloudFront cache
+      - name: Invalidate CloudFront
+        run: |
+          DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name PREREQ --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text --region us-east-2)
+          if [ ! -z "$DISTRIBUTION_ID" ] && [ "$DISTRIBUTION_ID" != "None" ]; then
+            aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+          else
+            echo "No CloudFront distribution ID found, skipping invalidation"
+          fi 
