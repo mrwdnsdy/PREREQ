@@ -324,3 +324,5 @@ For support and questions:
 ---
 
 **Built with ❤️ using modern web technologies** # AWS deployment configured with GitHub secrets
+
+<!-- Deployment trigger: 2025-01-08 -->
