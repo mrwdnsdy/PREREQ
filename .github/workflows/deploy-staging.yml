@@ -29,9 +29,9 @@ jobs:
 
       # 4 – Build the React front-end
       - name: Build front-end
+        working-directory: ./frontend
         run: |
-          cd frontend
-          npm ci
+          npm install
           npm run build
 
       # 5 – Sync static site to the staging bucket
