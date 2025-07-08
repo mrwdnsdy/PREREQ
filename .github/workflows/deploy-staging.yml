@@ -77,6 +77,12 @@ jobs:
         working-directory: ./infrastructure
         run: npm install
 
+      # 8 – Bootstrap CDK (if needed)
+      - name: CDK Bootstrap
+        run: |
+          cd infrastructure
+          npx cdk bootstrap aws://$AWS_ACCOUNT_ID/us-east-1 || echo "CDK already bootstrapped"
+
       - name: CDK deploy (stage)
         run: |
           cd infrastructure
