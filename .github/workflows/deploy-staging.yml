@@ -64,7 +64,14 @@ jobs:
         run: |
           aws s3 sync frontend/dist s3://prereq-frontend-stage-$AWS_ACCOUNT_ID-us-east-1 --delete
 
-      # 7 – Deploy / update infrastructure (CDK)
+      # 6 – Build backend (NestJS)
+      - name: Build backend
+        working-directory: ./backend
+        run: |
+          npm install
+          npm run build
+
+      # 7 – Install infrastructure dependencies  
       - name: Install infra deps
         working-directory: ./infrastructure
         run: npm install
