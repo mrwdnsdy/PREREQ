@@ -42,6 +42,7 @@ jobs:
         cd backend
         npm ci
         npm run build
+        ls -la dist/  # Debug: verify dist directory exists
         cd ..
     - name: Bootstrap CDK (if needed)
       run: |
@@ -53,7 +54,7 @@ jobs:
     - name: Deploy CDK stack
       run: |
         cd infrastructure
-        npx cdk deploy --require-approval never
+        npx cdk deploy --require-approval never --context stage=stage
         
     - name: Get API Gateway URL
       run: |
