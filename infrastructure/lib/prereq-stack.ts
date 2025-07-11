@@ -13,6 +13,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
+import * as path from 'path';
 
 export class PrereqStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -262,7 +263,7 @@ export class PrereqStack extends cdk.Stack {
     const apiLambda = new lambda.Function(this, 'PrereqAPILambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'main.handler',
-      code: lambda.Code.fromAsset('../backend/dist'),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../backend/dist')),
       vpc,
       securityGroups: [lambdaSg],
       environment: {
