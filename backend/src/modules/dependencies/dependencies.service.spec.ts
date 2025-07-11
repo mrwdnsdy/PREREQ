@@ -72,7 +72,7 @@ describe('DependenciesService', () => {
     const createDto = {
       predecessorId: 'task1',
       successorId: 'task2',
-      type: 'FS',
+      type: 'FS' as 'FS',
       lag: 0,
     };
 
@@ -111,7 +111,7 @@ describe('DependenciesService', () => {
       const selfLinkDto = {
         predecessorId: 'task1',
         successorId: 'task1', // Same task!
-        type: 'FS',
+        type: 'FS' as 'FS',
         lag: 0,
       };
 
@@ -306,7 +306,7 @@ describe('DependenciesService', () => {
 
   describe('update', () => {
     const updateDto = {
-      type: 'SS',
+      type: 'SS' as 'SS',
       lag: 5,
     };
 

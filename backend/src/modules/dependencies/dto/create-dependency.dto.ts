@@ -29,7 +29,7 @@ export class CreateDependencyDto {
   @IsEnum({
     message: 'Type must be one of: FS (Finish-to-Start), SS (Start-to-Start), FF (Finish-to-Finish), SF (Start-to-Finish)'
   })
-  type: string;
+  type: 'FS' | 'SS' | 'FF' | 'SF';
 
   @IsInt({ message: 'Lag must be an integer (can be negative for leads)' })
   @Min(-365, { message: 'Lag cannot be less than -365 days' })
