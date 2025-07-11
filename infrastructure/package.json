@@ -12,9 +12,6 @@
     "destroy": "cdk destroy --all",
     "diff": "cdk diff"
   },
-  "dependencies": {
-    "left-pad": "^1.3.0"
-  },
   "devDependencies": {
     "@types/jest": "^29.5.2",
     "@types/node": "^20.19.7",
