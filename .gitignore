@@ -18,6 +18,16 @@ yarn-error.log*
 /infrastructure/cdk.out/
 /infrastructure/dist/
 
+# Large files that exceed GitHub limits
+*.zip
+backend/*.zip
+backend/cdk.out/
+backend/function*.zip
+backend/lambda*.zip
+backend/cdk.out/asset.*/
+lambda-production.zip
+lambda-ultra-minimal/
+
 # IDE files
 .vscode/
 .idea/
@@ -52,8 +62,13 @@ coverage/
 *.temp
 
 # Package lock files (keep only one type)
-package-lock.json
-yarn.lock
+# package-lock.json
+# yarn.lock
+# Allow lock files for CI/CD
+!package-lock.json
+!backend/package-lock.json
+!frontend/package-lock.json
+!infrastructure/package-lock.json
 
 # AWS credentials (never commit these)
 .aws/
