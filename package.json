@@ -12,6 +12,7 @@
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../infrastructure && npm install"
   },
   "devDependencies": {
+    "@types/node": "^24.0.13",
     "concurrently": "^8.2.2"
   },
   "workspaces": [
