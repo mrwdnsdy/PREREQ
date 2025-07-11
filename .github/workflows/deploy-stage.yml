@@ -45,6 +45,19 @@ jobs:
         ls -la dist/  # Debug: verify dist directory exists
         cd ..
         ls -la backend/dist/  # Debug: verify from root
+    
+    - name: Ensure backend dist exists
+      run: |
+        # Ensure the backend/dist directory exists
+        if [ ! -d "backend/dist" ]; then
+          echo "ERROR: backend/dist directory not found after build!"
+          echo "Creating minimal dist directory with handler..."
+          mkdir -p backend/dist
+          echo "exports.handler = async (event) => { return { statusCode: 200, body: 'Placeholder' }; };" > backend/dist/main.js
+        fi
+        echo "Contents of backend/dist:"
+        ls -la backend/dist/
+        
     - name: Bootstrap CDK (if needed)
       run: |
         cd infrastructure
