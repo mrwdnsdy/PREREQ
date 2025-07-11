@@ -58,6 +58,10 @@ jobs:
         # Debug: Check current directory and backend dist
         pwd
         ls -la ../backend/dist/ || echo "Backend dist not found!"
+        # Set absolute path for backend dist
+        export BACKEND_DIST_PATH="${GITHUB_WORKSPACE}/backend/dist"
+        echo "Backend dist path: $BACKEND_DIST_PATH"
+        ls -la $BACKEND_DIST_PATH || echo "Backend dist not found at absolute path!"
         npx cdk deploy --require-approval never --context stage=stage
         
     - name: Get API Gateway URL
