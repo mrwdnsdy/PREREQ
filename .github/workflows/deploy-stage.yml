@@ -58,6 +58,14 @@ jobs:
         echo "Contents of backend/dist:"
         ls -la backend/dist/
         
+    - name: Build infrastructure
+      run: |
+        cd infrastructure
+        echo "Building infrastructure TypeScript..."
+        npm run build
+        echo "Infrastructure build completed"
+        ls -la bin/*.js lib/*.js
+        
     - name: Bootstrap CDK (if needed)
       run: |
         cd infrastructure
