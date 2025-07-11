@@ -60,21 +60,9 @@ jobs:
         
     - name: Build infrastructure
       run: |
-        cd infrastructure
-        echo "Current directory: $(pwd)"
-        echo "Checking for TypeScript..."
-        npx tsc --version || echo "TypeScript not found!"
-        echo "Checking node_modules..."
-        ls -la node_modules/@types/node || echo "@types/node not found!"
-        echo "Building infrastructure TypeScript..."
-        # Ensure node_modules are present
-        if [ ! -d "node_modules" ]; then
-          echo "node_modules not found, running npm ci..."
-          npm ci
-        fi
-        npm run build || (echo "Build failed, showing error details:" && npx tsc)
+        npm run --workspace infrastructure build
         echo "Infrastructure build completed"
-        ls -la bin/*.js lib/*.js || echo "No JS files generated!"
+        ls -la infrastructure/bin/*.js infrastructure/lib/*.js || echo "No JS files generated!"
         
     - name: Bootstrap CDK (if needed)
       run: |
