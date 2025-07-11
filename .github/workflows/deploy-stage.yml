@@ -1,0 +1,52 @@
+name: Deploy to Stage
+
+on:
+  push:
+    branches: [ stage-clean ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd infrastructure && npm ci
+        
+    - name: Bootstrap CDK (if needed)
+      run: |
+        cd infrastructure
+        npx cdk bootstrap --require-approval never
+        
+    - name: Deploy CDK stack
+      run: |
+        cd infrastructure
+        npx cdk deploy --require-approval never
+        
+    - name: Get API Gateway URL
+      run: |
+        cd infrastructure
+        API_URL=$(npx cdk output --format json | jq -r '.["PREREQ"].ApiGatewayUrl // empty')
+        echo "API_URL=$API_URL" >> $GITHUB_ENV
+        echo "Deployed API Gateway URL: $API_URL" 
