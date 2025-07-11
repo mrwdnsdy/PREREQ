@@ -33,12 +33,16 @@ jobs:
       run: |
         npm ci
         cd infrastructure && npm ci
-        
+    - name: Build backend
+      run: |
+        cd backend
+        npm ci
+        npm run build
+        cd ..
     - name: Bootstrap CDK (if needed)
       run: |
         cd infrastructure
         npx cdk bootstrap --require-approval never
-        
     - name: Deploy CDK stack
       run: |
         cd infrastructure
