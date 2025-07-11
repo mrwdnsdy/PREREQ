@@ -31,8 +31,12 @@ jobs:
         
     - name: Install dependencies
       run: |
+        echo "Installing root dependencies..."
         npm ci
-        cd infrastructure && npm ci
+        echo "Installing infrastructure dependencies..."
+        cd infrastructure
+        npm ci
+        cd ..
     - name: Build backend
       run: |
         cd backend
