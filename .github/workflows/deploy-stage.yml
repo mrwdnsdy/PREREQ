@@ -66,26 +66,16 @@ jobs:
         
     - name: Bootstrap CDK (if needed)
       run: |
-        cd infrastructure
-        echo "Checking AWS credentials..."
-        aws sts get-caller-identity
-        echo "Running CDK bootstrap..."
-        npx cdk bootstrap --context stage=stage || echo "Bootstrap might already exist, continuing..."
+        npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" bootstrap --require-approval never
+      env:
+        AWS_REGION: ${{ env.AWS_REGION }}
     - name: Deploy CDK stack
       run: |
-        cd infrastructure
-        # Debug: Check current directory and backend dist
-        pwd
-        ls -la ../backend/dist/ || echo "Backend dist not found!"
-        # Set absolute path for backend dist
-        export BACKEND_DIST_PATH="${GITHUB_WORKSPACE}/backend/dist"
-        echo "Backend dist path: $BACKEND_DIST_PATH"
-        ls -la $BACKEND_DIST_PATH || echo "Backend dist not found at absolute path!"
-        npx cdk deploy --require-approval never --context stage=stage
-        
+        npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" deploy --require-approval never
+      env:
+        AWS_REGION: ${{ env.AWS_REGION }}
     - name: Get API Gateway URL
       run: |
-        cd infrastructure
-        API_URL=$(npx cdk output --format json | jq -r '.["PREREQ"].ApiGatewayUrl // empty')
+        npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" output --json | jq -r '.PREREQ.ApiGatewayUrl // empty'
         echo "API_URL=$API_URL" >> $GITHUB_ENV
         echo "Deployed API Gateway URL: $API_URL" 
