@@ -1,5 +1,5 @@
 import { IsEnum, IsInt, IsNotEmpty, IsString, Min, Max, Validate, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
-import { DependencyType } from '@prisma/client';
+// import { DependencyType } from '@prisma/client';
 
 /**
  * Custom validator to ensure predecessor and successor are different tasks
@@ -26,10 +26,10 @@ export class CreateDependencyDto {
   @Validate(IsNotSelfLinkConstraint)
   successorId: string;
 
-  @IsEnum(DependencyType, {
+  @IsEnum({
     message: 'Type must be one of: FS (Finish-to-Start), SS (Start-to-Start), FF (Finish-to-Finish), SF (Start-to-Finish)'
   })
-  type: DependencyType;
+  type: string;
 
   @IsInt({ message: 'Lag must be an integer (can be negative for leads)' })
   @Min(-365, { message: 'Lag cannot be less than -365 days' })

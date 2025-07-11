@@ -2,7 +2,6 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateDependencyDto } from './dto/create-dependency.dto';
 import { UpdateDependencyDto } from './dto/update-dependency.dto';
-import { TaskDependency } from '@prisma/client';
 
 @Injectable()
 export class DependenciesService {

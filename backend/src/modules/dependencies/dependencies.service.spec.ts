@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DependenciesService } from './dependencies.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { DependencyType } from '@prisma/client';
 
 describe('DependenciesService', () => {
   let service: DependenciesService;
@@ -26,7 +25,7 @@ describe('DependenciesService', () => {
     id: 'dep1',
     predecessorId: 'task1',
     successorId: 'task2',
-    type: DependencyType.FS,
+    type: 'FS',
     lag: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -73,7 +72,7 @@ describe('DependenciesService', () => {
     const createDto = {
       predecessorId: 'task1',
       successorId: 'task2',
-      type: DependencyType.FS,
+      type: 'FS',
       lag: 0,
     };
 
@@ -94,7 +93,7 @@ describe('DependenciesService', () => {
         data: {
           predecessorId: 'task1',
           successorId: 'task2',
-          type: DependencyType.FS,
+          type: 'FS',
           lag: 0,
         },
         include: {
@@ -112,7 +111,7 @@ describe('DependenciesService', () => {
       const selfLinkDto = {
         predecessorId: 'task1',
         successorId: 'task1', // Same task!
-        type: DependencyType.FS,
+        type: 'FS',
         lag: 0,
       };
 
@@ -190,7 +189,7 @@ describe('DependenciesService', () => {
           id: 'reverse-dep',
           predecessorId: 'task2',
           successorId: 'task1',
-          type: DependencyType.FS,
+          type: 'FS',
           lag: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -307,7 +306,7 @@ describe('DependenciesService', () => {
 
   describe('update', () => {
     const updateDto = {
-      type: DependencyType.SS,
+      type: 'SS',
       lag: 5,
     };
 
