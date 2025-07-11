@@ -30,52 +30,22 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
         
     - name: Install dependencies
-      run: |
-        echo "Installing root dependencies..."
-        npm ci
-        echo "Installing infrastructure dependencies..."
-        cd infrastructure
-        npm ci --include=dev
-        cd ..
+      run: npm ci
+        
     - name: Build backend
-      run: |
-        cd backend
-        npm ci
-        npm run build
-        ls -la dist/  # Debug: verify dist directory exists
-        cd ..
-        ls -la backend/dist/  # Debug: verify from root
-    
-    - name: Ensure backend dist exists
-      run: |
-        # Ensure the backend/dist directory exists
-        if [ ! -d "backend/dist" ]; then
-          echo "ERROR: backend/dist directory not found after build!"
-          echo "Creating minimal dist directory with handler..."
-          mkdir -p backend/dist
-          echo "exports.handler = async (event) => { return { statusCode: 200, body: 'Placeholder' }; };" > backend/dist/main.js
-        fi
-        echo "Contents of backend/dist:"
-        ls -la backend/dist/
+      run: npm run --workspace backend build
         
     - name: Build infrastructure
-      run: |
-        npm run --workspace infrastructure build
-        echo "Infrastructure build completed"
-        ls -la infrastructure/bin/*.js infrastructure/lib/*.js || echo "No JS files generated!"
+      run: npm run --workspace infrastructure build
         
     - name: Bootstrap CDK (if needed)
-      run: |
-        npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" bootstrap --require-approval never
-      env:
-        AWS_REGION: ${{ env.AWS_REGION }}
+      run: npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" bootstrap --require-approval never
+        
     - name: Deploy CDK stack
-      run: |
-        npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" deploy --require-approval never
-      env:
-        AWS_REGION: ${{ env.AWS_REGION }}
+      run: npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" deploy --require-approval never
+        
     - name: Get API Gateway URL
       run: |
-        npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" output --json | jq -r '.PREREQ.ApiGatewayUrl // empty'
+        API_URL=$(npx cdk --app "npx ts-node --prefer-ts-exts infrastructure/bin/prereq.ts" output --format json | jq -r '.["PREREQ"].ApiGatewayUrl // empty')
         echo "API_URL=$API_URL" >> $GITHUB_ENV
         echo "Deployed API Gateway URL: $API_URL" 
