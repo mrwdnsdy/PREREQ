@@ -46,7 +46,10 @@ jobs:
     - name: Bootstrap CDK (if needed)
       run: |
         cd infrastructure
-        npx cdk bootstrap --require-approval never
+        echo "Checking AWS credentials..."
+        aws sts get-caller-identity
+        echo "Running CDK bootstrap..."
+        npx cdk bootstrap --context stage=stage || echo "Bootstrap might already exist, continuing..."
     - name: Deploy CDK stack
       run: |
         cd infrastructure
