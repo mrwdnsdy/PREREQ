@@ -35,7 +35,7 @@ jobs:
         npm ci
         echo "Installing infrastructure dependencies..."
         cd infrastructure
-        npm ci
+        npm ci --include=dev
         cd ..
     - name: Build backend
       run: |
