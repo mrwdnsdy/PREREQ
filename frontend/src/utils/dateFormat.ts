@@ -2,17 +2,38 @@
  * Date formatting utilities for consistent date display across the application
  */
 
-const MONTH_NAMES = [
-  'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-  'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
-];
+/**
+ * Formats a date to DD-MMM-YYYY format (e.g., 07-SEP-2025)
+ * @param d - Date, ISO string, or null
+ * @returns Formatted date string or empty string for null
+ */
+export const formatDate = (d: Date | string | null): string => {
+  if (d === null) return ''
+  
+  try {
+    const date = typeof d === 'string' ? new Date(d) : d
+    
+    if (isNaN(date.getTime())) {
+      return ''
+    }
+    
+    const day = date.getDate().toString().padStart(2, '0')
+    const month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][date.getMonth()]
+    const year = date.getFullYear()
+    
+    return `${day}-${month}-${year}`
+  } catch (error) {
+    return ''
+  }
+}
 
 /**
  * Formats a date to dd-MMM-YYYY format (e.g., 02-JUL-2025)
  * @param dateInput - Date string or Date object
  * @returns Formatted date string
  */
-export const formatDate = (dateInput: string | Date): string => {
+export const formatDateLegacy = (dateInput: string | Date): string => {
   try {
     const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     
@@ -21,7 +42,8 @@ export const formatDate = (dateInput: string | Date): string => {
     }
     
     const day = date.getDate().toString().padStart(2, '0');
-    const month = MONTH_NAMES[date.getMonth()];
+    const month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][date.getMonth()];
     const year = date.getFullYear();
     
     return `${day}-${month}-${year}`;
@@ -44,7 +66,8 @@ export const formatDateShort = (dateInput: string | Date): string => {
     }
     
     const day = date.getDate().toString().padStart(2, '0');
-    const month = MONTH_NAMES[date.getMonth()];
+    const month = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][date.getMonth()];
     const year = date.getFullYear().toString().slice(-2);
     
     return `${day}-${month}-${year}`;

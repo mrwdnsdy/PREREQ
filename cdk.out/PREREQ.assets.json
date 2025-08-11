@@ -1,0 +1,51 @@
+{
+  "version": "45.0.0",
+  "files": {
+    "561a6d8b59c12cac1f206cf64a511230df54f2fc1a4f637fd34a7cbb9c7c3f62": {
+      "displayName": "PrereqAPILambda/Code",
+      "source": {
+        "path": "asset.561a6d8b59c12cac1f206cf64a511230df54f2fc1a4f637fd34a7cbb9c7c3f62",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "911167926050-us-east-2": {
+          "bucketName": "cdk-hnb659fds-assets-911167926050-us-east-2",
+          "objectKey": "561a6d8b59c12cac1f206cf64a511230df54f2fc1a4f637fd34a7cbb9c7c3f62.zip",
+          "region": "us-east-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::911167926050:role/cdk-hnb659fds-file-publishing-role-911167926050-us-east-2"
+        }
+      }
+    },
+    "faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6": {
+      "displayName": "PREREQ/Custom::S3AutoDeleteObjectsCustomResourceProvider Code",
+      "source": {
+        "path": "asset.faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "911167926050-us-east-2": {
+          "bucketName": "cdk-hnb659fds-assets-911167926050-us-east-2",
+          "objectKey": "faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6.zip",
+          "region": "us-east-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::911167926050:role/cdk-hnb659fds-file-publishing-role-911167926050-us-east-2"
+        }
+      }
+    },
+    "4ffffa9d851da332a5d85e670a53ae26b304bede0ede7bd2d049aed5ad61735b": {
+      "displayName": "PREREQ Template",
+      "source": {
+        "path": "PREREQ.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "911167926050-us-east-2": {
+          "bucketName": "cdk-hnb659fds-assets-911167926050-us-east-2",
+          "objectKey": "4ffffa9d851da332a5d85e670a53ae26b304bede0ede7bd2d049aed5ad61735b.json",
+          "region": "us-east-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::911167926050:role/cdk-hnb659fds-file-publishing-role-911167926050-us-east-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

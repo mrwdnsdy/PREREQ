@@ -262,7 +262,7 @@ export class PrereqStack extends cdk.Stack {
     // bundling: { externalModules: ['@nestjs/*', 'pg'] }
     const apiLambda = new lambda.Function(this, 'PrereqAPILambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'main.handler',
+      handler: 'lambda.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../backend/dist')),
       vpc,
       securityGroups: [lambdaSg],

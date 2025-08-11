@@ -1,0 +1,2038 @@
+{
+ "Transform": "AWS::Serverless-2016-10-31",
+ "Resources": {
+  "PrereqVPC60022FC8": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/Resource"
+   }
+  },
+  "PrereqVPCPublicSubnet1Subnet2E4E4EF2": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-2a",
+    "CidrBlock": "10.0.0.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet1/Subnet"
+   }
+  },
+  "PrereqVPCPublicSubnet1RouteTableF7EB1CC9": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet1/RouteTable"
+   }
+  },
+  "PrereqVPCPublicSubnet1RouteTableAssociationF71F9808": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrereqVPCPublicSubnet1RouteTableF7EB1CC9"
+    },
+    "SubnetId": {
+     "Ref": "PrereqVPCPublicSubnet1Subnet2E4E4EF2"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet1/RouteTableAssociation"
+   }
+  },
+  "PrereqVPCPublicSubnet1DefaultRouteBB3BA430": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "PrereqVPCIGW8C79008E"
+    },
+    "RouteTableId": {
+     "Ref": "PrereqVPCPublicSubnet1RouteTableF7EB1CC9"
+    }
+   },
+   "DependsOn": [
+    "PrereqVPCVPCGW2A8C09AF"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet1/DefaultRoute"
+   }
+  },
+  "PrereqVPCPublicSubnet2Subnet780B5677": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-2b",
+    "CidrBlock": "10.0.1.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet2/Subnet"
+   }
+  },
+  "PrereqVPCPublicSubnet2RouteTable3E4DB508": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet2/RouteTable"
+   }
+  },
+  "PrereqVPCPublicSubnet2RouteTableAssociation188F2712": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrereqVPCPublicSubnet2RouteTable3E4DB508"
+    },
+    "SubnetId": {
+     "Ref": "PrereqVPCPublicSubnet2Subnet780B5677"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet2/RouteTableAssociation"
+   }
+  },
+  "PrereqVPCPublicSubnet2DefaultRoute56C6A38B": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "PrereqVPCIGW8C79008E"
+    },
+    "RouteTableId": {
+     "Ref": "PrereqVPCPublicSubnet2RouteTable3E4DB508"
+    }
+   },
+   "DependsOn": [
+    "PrereqVPCVPCGW2A8C09AF"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PublicSubnet2/DefaultRoute"
+   }
+  },
+  "PrereqVPCPrivateSubnet1Subnet5334BA66": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-2a",
+    "CidrBlock": "10.0.2.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PrivateSubnet1/Subnet"
+   }
+  },
+  "PrereqVPCPrivateSubnet1RouteTable98B2248D": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PrivateSubnet1/RouteTable"
+   }
+  },
+  "PrereqVPCPrivateSubnet1RouteTableAssociation9F00AE0C": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrereqVPCPrivateSubnet1RouteTable98B2248D"
+    },
+    "SubnetId": {
+     "Ref": "PrereqVPCPrivateSubnet1Subnet5334BA66"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PrivateSubnet1/RouteTableAssociation"
+   }
+  },
+  "PrereqVPCPrivateSubnet2Subnet4BA1B5F6": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "us-east-2b",
+    "CidrBlock": "10.0.3.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Isolated"
+     },
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PrivateSubnet2/Subnet"
+   }
+  },
+  "PrereqVPCPrivateSubnet2RouteTable1574D2E6": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PrivateSubnet2/RouteTable"
+   }
+  },
+  "PrereqVPCPrivateSubnet2RouteTableAssociation827E55FE": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrereqVPCPrivateSubnet2RouteTable1574D2E6"
+    },
+    "SubnetId": {
+     "Ref": "PrereqVPCPrivateSubnet2Subnet4BA1B5F6"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/PrivateSubnet2/RouteTableAssociation"
+   }
+  },
+  "PrereqVPCIGW8C79008E": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/IGW"
+   }
+  },
+  "PrereqVPCVPCGW2A8C09AF": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "PrereqVPCIGW8C79008E"
+    },
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/VPCGW"
+   }
+  },
+  "PrereqVPCS3Endpoint4EEAF792": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "RouteTableIds": [
+     {
+      "Ref": "PrereqVPCPublicSubnet1RouteTableF7EB1CC9"
+     },
+     {
+      "Ref": "PrereqVPCPublicSubnet2RouteTable3E4DB508"
+     },
+     {
+      "Ref": "PrereqVPCPrivateSubnet1RouteTable98B2248D"
+     },
+     {
+      "Ref": "PrereqVPCPrivateSubnet2RouteTable1574D2E6"
+     }
+    ],
+    "ServiceName": {
+     "Fn::Join": [
+      "",
+      [
+       "com.amazonaws.",
+       {
+        "Ref": "AWS::Region"
+       },
+       ".s3"
+      ]
+     ]
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC"
+     }
+    ],
+    "VpcEndpointType": "Gateway",
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/S3Endpoint/Resource"
+   }
+  },
+  "PrereqVPCSecretsEndpointSecurityGroup5EB16366": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "PREREQ/PrereqVPC/SecretsEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": {
+       "Fn::GetAtt": [
+        "PrereqVPC60022FC8",
+        "CidrBlock"
+       ]
+      },
+      "Description": {
+       "Fn::Join": [
+        "",
+        [
+         "from ",
+         {
+          "Fn::GetAtt": [
+           "PrereqVPC60022FC8",
+           "CidrBlock"
+          ]
+         },
+         ":443"
+        ]
+       ]
+      },
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/SecretsEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "PrereqVPCSecretsEndpointA622CC86": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "PrereqVPCSecretsEndpointSecurityGroup5EB16366",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.us-east-2.secretsmanager",
+    "SubnetIds": [
+     {
+      "Ref": "PrereqVPCPrivateSubnet1Subnet5334BA66"
+     },
+     {
+      "Ref": "PrereqVPCPrivateSubnet2Subnet4BA1B5F6"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "PREREQ/PrereqVPC"
+     }
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqVPC/SecretsEndpoint/Resource"
+   }
+  },
+  "PrereqLambdaSGCF0C0BC3": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Security group for PREREQ Lambda functions",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqLambdaSG/Resource"
+   }
+  },
+  "PrereqDBSecurityGroup4B9EF72E": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Security group for PREREQ RDS instance",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "70.30.4.207/32",
+      "Description": "Allow PostgreSQL access from developer IP (dev only)",
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "ToPort": 5432
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDBSecurityGroup/Resource"
+   }
+  },
+  "PrereqDBSecurityGroupfromPREREQPrereqLambdaSG80D74A875432B1C04B10": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Allow PostgreSQL access from Lambda",
+    "FromPort": 5432,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "PrereqDBSecurityGroup4B9EF72E",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "PrereqLambdaSGCF0C0BC3",
+      "GroupId"
+     ]
+    },
+    "ToPort": 5432
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDBSecurityGroup/from PREREQPrereqLambdaSG80D74A87:5432"
+   }
+  },
+  "PrereqDBSecurityGroupfromPREREQPrereqDatabaseRotationSingleUserSecurityGroup01241D4EIndirectPortDB1836E5": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "from PREREQPrereqDatabaseRotationSingleUserSecurityGroup01241D4E:{IndirectPort}",
+    "FromPort": {
+     "Fn::GetAtt": [
+      "PrereqDatabase4F1D7173",
+      "Endpoint.Port"
+     ]
+    },
+    "GroupId": {
+     "Fn::GetAtt": [
+      "PrereqDBSecurityGroup4B9EF72E",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "PrereqDatabaseRotationSingleUserSecurityGroupBA4B58CF",
+      "GroupId"
+     ]
+    },
+    "ToPort": {
+     "Fn::GetAtt": [
+      "PrereqDatabase4F1D7173",
+      "Endpoint.Port"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDBSecurityGroup/from PREREQPrereqDatabaseRotationSingleUserSecurityGroup01241D4E:{IndirectPort}"
+   }
+  },
+  "PrereqDatabaseSubnetGroup169D822F": {
+   "Type": "AWS::RDS::DBSubnetGroup",
+   "Properties": {
+    "DBSubnetGroupDescription": "Subnet group for PrereqDatabase database",
+    "SubnetIds": [
+     {
+      "Ref": "PrereqVPCPublicSubnet1Subnet2E4E4EF2"
+     },
+     {
+      "Ref": "PrereqVPCPublicSubnet2Subnet780B5677"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/SubnetGroup/Default"
+   }
+  },
+  "PREREQPrereqDatabaseSecret455AF0EA3fdaad7efa858a3daf9490cf0a702aeb": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Generated by the CDK for stack: ",
+       {
+        "Ref": "AWS::StackName"
+       }
+      ]
+     ]
+    },
+    "GenerateSecretString": {
+     "ExcludeCharacters": " %+~`#$&*()|[]{}:;<>?!'/@\"\\",
+     "GenerateStringKey": "password",
+     "PasswordLength": 30,
+     "SecretStringTemplate": "{\"username\":\"prereq_admin\"}"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/Secret/Resource"
+   }
+  },
+  "PrereqDatabaseSecretAttachment783A7E20": {
+   "Type": "AWS::SecretsManager::SecretTargetAttachment",
+   "Properties": {
+    "SecretId": {
+     "Ref": "PREREQPrereqDatabaseSecret455AF0EA3fdaad7efa858a3daf9490cf0a702aeb"
+    },
+    "TargetId": {
+     "Ref": "PrereqDatabase4F1D7173"
+    },
+    "TargetType": "AWS::RDS::DBInstance"
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/Secret/Attachment/Resource"
+   }
+  },
+  "PrereqDatabaseSecretAttachmentRotationSchedule7279BA51": {
+   "Type": "AWS::SecretsManager::RotationSchedule",
+   "Properties": {
+    "RotationLambdaARN": {
+     "Fn::GetAtt": [
+      "PrereqDatabaseRotationSingleUserD1A2D905",
+      "Outputs.RotationLambdaARN"
+     ]
+    },
+    "RotationRules": {
+     "ScheduleExpression": "rate(30 days)"
+    },
+    "SecretId": {
+     "Ref": "PrereqDatabaseSecretAttachment783A7E20"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/Secret/Attachment/RotationSchedule/Resource"
+   }
+  },
+  "PrereqDatabaseSecretAttachmentPolicyAB8AB012": {
+   "Type": "AWS::SecretsManager::ResourcePolicy",
+   "Properties": {
+    "ResourcePolicy": {
+     "Statement": [
+      {
+       "Action": "secretsmanager:DeleteSecret",
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":iam::911167926050:root"
+          ]
+         ]
+        }
+       },
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "SecretId": {
+     "Ref": "PrereqDatabaseSecretAttachment783A7E20"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/Secret/Attachment/Policy/Resource"
+   }
+  },
+  "PrereqDatabase4F1D7173": {
+   "Type": "AWS::RDS::DBInstance",
+   "Properties": {
+    "AllocatedStorage": "100",
+    "BackupRetentionPeriod": 7,
+    "CopyTagsToSnapshot": true,
+    "DBInstanceClass": "db.t3.micro",
+    "DBName": "prereq",
+    "DBSubnetGroupName": {
+     "Ref": "PrereqDatabaseSubnetGroup169D822F"
+    },
+    "DeletionProtection": false,
+    "EnableIAMDatabaseAuthentication": true,
+    "Engine": "postgres",
+    "EngineVersion": "17.5",
+    "MasterUserPassword": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "PREREQPrereqDatabaseSecret455AF0EA3fdaad7efa858a3daf9490cf0a702aeb"
+       },
+       ":SecretString:password::}}"
+      ]
+     ]
+    },
+    "MasterUsername": "prereq_admin",
+    "PubliclyAccessible": true,
+    "StorageType": "gp2",
+    "VPCSecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "PrereqDBSecurityGroup4B9EF72E",
+       "GroupId"
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/Resource"
+   }
+  },
+  "PrereqDatabaseRotationSingleUserSecurityGroupBA4B58CF": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "PREREQ/PrereqDatabase/RotationSingleUser/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "PrereqVPC60022FC8"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/RotationSingleUser/SecurityGroup/Resource"
+   }
+  },
+  "PrereqDatabaseRotationSingleUserD1A2D905": {
+   "Type": "AWS::Serverless::Application",
+   "Properties": {
+    "Location": {
+     "ApplicationId": {
+      "Fn::FindInMap": [
+       "PrereqDatabaseRotationSingleUserSARMappingCA03BAF2",
+       {
+        "Ref": "AWS::Partition"
+       },
+       "applicationId"
+      ]
+     },
+     "SemanticVersion": {
+      "Fn::FindInMap": [
+       "PrereqDatabaseRotationSingleUserSARMappingCA03BAF2",
+       {
+        "Ref": "AWS::Partition"
+       },
+       "semanticVersion"
+      ]
+     }
+    },
+    "Parameters": {
+     "endpoint": {
+      "Fn::Join": [
+       "",
+       [
+        "https://secretsmanager.us-east-2.",
+        {
+         "Ref": "AWS::URLSuffix"
+        }
+       ]
+      ]
+     },
+     "functionName": "PREREQPrereqDatabaseRotationSingleUser591B860F",
+     "vpcSubnetIds": {
+      "Fn::Join": [
+       "",
+       [
+        {
+         "Ref": "PrereqVPCPublicSubnet1Subnet2E4E4EF2"
+        },
+        ",",
+        {
+         "Ref": "PrereqVPCPublicSubnet2Subnet780B5677"
+        }
+       ]
+      ]
+     },
+     "vpcSecurityGroupIds": {
+      "Fn::GetAtt": [
+       "PrereqDatabaseRotationSingleUserSecurityGroupBA4B58CF",
+       "GroupId"
+      ]
+     },
+     "excludeCharacters": " %+~`#$&*()|[]{}:;<>?!'/@\"\\"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDatabase/RotationSingleUser/Resource"
+   }
+  },
+  "JwtSecretB8834B39": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "JWT signing secret for PREREQ API",
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "PasswordLength": 32
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/JwtSecret/Resource"
+   }
+  },
+  "PrereqUserPool73A41AD9": {
+   "Type": "AWS::Cognito::UserPool",
+   "Properties": {
+    "AccountRecoverySetting": {
+     "RecoveryMechanisms": [
+      {
+       "Name": "verified_email",
+       "Priority": 1
+      }
+     ]
+    },
+    "AdminCreateUserConfig": {
+     "AllowAdminCreateUserOnly": false
+    },
+    "AutoVerifiedAttributes": [
+     "email"
+    ],
+    "EmailVerificationMessage": "The verification code to your new account is {####}",
+    "EmailVerificationSubject": "Verify your new account",
+    "Policies": {
+     "PasswordPolicy": {
+      "MinimumLength": 8,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireSymbols": true,
+      "RequireUppercase": true
+     }
+    },
+    "Schema": [
+     {
+      "Mutable": true,
+      "Name": "email",
+      "Required": true
+     },
+     {
+      "Mutable": true,
+      "Name": "name",
+      "Required": false
+     }
+    ],
+    "SmsVerificationMessage": "The verification code to your new account is {####}",
+    "UserPoolName": "prereq-users",
+    "UsernameAttributes": [
+     "email"
+    ],
+    "VerificationMessageTemplate": {
+     "DefaultEmailOption": "CONFIRM_WITH_CODE",
+     "EmailMessage": "The verification code to your new account is {####}",
+     "EmailSubject": "Verify your new account",
+     "SmsMessage": "The verification code to your new account is {####}"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqUserPool/Resource"
+   }
+  },
+  "PrereqUserPoolClientFC10A44C": {
+   "Type": "AWS::Cognito::UserPoolClient",
+   "Properties": {
+    "AllowedOAuthFlows": [
+     "code"
+    ],
+    "AllowedOAuthFlowsUserPoolClient": true,
+    "AllowedOAuthScopes": [
+     "email",
+     "openid",
+     "profile"
+    ],
+    "CallbackURLs": [
+     "http://localhost:5173/callback",
+     "https://your-domain.com/callback"
+    ],
+    "ClientName": "prereq-client",
+    "ExplicitAuthFlows": [
+     "ALLOW_USER_PASSWORD_AUTH",
+     "ALLOW_ADMIN_USER_PASSWORD_AUTH",
+     "ALLOW_USER_SRP_AUTH",
+     "ALLOW_REFRESH_TOKEN_AUTH"
+    ],
+    "GenerateSecret": false,
+    "SupportedIdentityProviders": [
+     "COGNITO"
+    ],
+    "UserPoolId": {
+     "Ref": "PrereqUserPool73A41AD9"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqUserPoolClient/Resource"
+   }
+  },
+  "PrereqAPILambdaServiceRoleE1EEEA3F": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "DependsOn": [
+    "PrereqVPCPrivateSubnet1RouteTableAssociation9F00AE0C",
+    "PrereqVPCPrivateSubnet2RouteTableAssociation827E55FE"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPILambda/ServiceRole/Resource"
+   }
+  },
+  "PrereqAPILambdaServiceRoleDefaultPolicy87E26CE1": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "rds-db:connect",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":rds-db:us-east-2:911167926050:dbuser:",
+          {
+           "Fn::GetAtt": [
+            "PrereqDatabase4F1D7173",
+            "DbiResourceId"
+           ]
+          },
+          "/{{resolve:secretsmanager:",
+          {
+           "Ref": "PrereqDatabaseSecretAttachment783A7E20"
+          },
+          ":SecretString:username::}}"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "PrereqDatabaseSecretAttachment783A7E20"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "JwtSecretB8834B39"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "PrereqAPILambdaServiceRoleDefaultPolicy87E26CE1",
+    "Roles": [
+     {
+      "Ref": "PrereqAPILambdaServiceRoleE1EEEA3F"
+     }
+    ]
+   },
+   "DependsOn": [
+    "PrereqVPCPrivateSubnet1RouteTableAssociation9F00AE0C",
+    "PrereqVPCPrivateSubnet2RouteTableAssociation827E55FE"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPILambda/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "PrereqAPILambda69775152": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-911167926050-us-east-2",
+     "S3Key": "561a6d8b59c12cac1f206cf64a511230df54f2fc1a4f637fd34a7cbb9c7c3f62.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "DB_SECRET_ARN": {
+       "Ref": "PrereqDatabaseSecretAttachment783A7E20"
+      },
+      "DB_HOST": {
+       "Fn::GetAtt": [
+        "PrereqDatabase4F1D7173",
+        "Endpoint.Address"
+       ]
+      },
+      "JWT_SECRET_ARN": {
+       "Ref": "JwtSecretB8834B39"
+      },
+      "COGNITO_USER_POOL_ID": {
+       "Ref": "PrereqUserPool73A41AD9"
+      },
+      "COGNITO_CLIENT_ID": {
+       "Ref": "PrereqUserPoolClientFC10A44C"
+      },
+      "NODE_ENV": "dev"
+     }
+    },
+    "Handler": "main.handler",
+    "MemorySize": 512,
+    "Role": {
+     "Fn::GetAtt": [
+      "PrereqAPILambdaServiceRoleE1EEEA3F",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs18.x",
+    "Timeout": 30,
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::GetAtt": [
+        "PrereqLambdaSGCF0C0BC3",
+        "GroupId"
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Ref": "PrereqVPCPrivateSubnet1Subnet5334BA66"
+      },
+      {
+       "Ref": "PrereqVPCPrivateSubnet2Subnet4BA1B5F6"
+      }
+     ]
+    }
+   },
+   "DependsOn": [
+    "PrereqAPILambdaServiceRoleDefaultPolicy87E26CE1",
+    "PrereqAPILambdaServiceRoleE1EEEA3F",
+    "PrereqVPCPrivateSubnet1RouteTableAssociation9F00AE0C",
+    "PrereqVPCPrivateSubnet2RouteTableAssociation827E55FE"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPILambda/Resource",
+    "aws:asset:path": "asset.561a6d8b59c12cac1f206cf64a511230df54f2fc1a4f637fd34a7cbb9c7c3f62",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "PrereqAPILambdaLogsC502D351": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "PrereqAPILambda69775152"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPILambdaLogs/Resource"
+   }
+  },
+  "PrereqApiLogsB9F94A22": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqApiLogs/Resource"
+   }
+  },
+  "PrereqAPI98B5AA89": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Description": "PREREQ Project Management API",
+    "Name": "PREREQ API"
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Resource"
+   }
+  },
+  "PrereqAPICloudWatchRoleB9E75E1F": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "apigateway.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+       ]
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/CloudWatchRole/Resource"
+   }
+  },
+  "PrereqAPIAccount4B1D4FD2": {
+   "Type": "AWS::ApiGateway::Account",
+   "Properties": {
+    "CloudWatchRoleArn": {
+     "Fn::GetAtt": [
+      "PrereqAPICloudWatchRoleB9E75E1F",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "PrereqAPI98B5AA89"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Account"
+   }
+  },
+  "PrereqAPIDeployment956D52201e01013ff02ad5abed396d795d3f7e75": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "PREREQ Project Management API",
+    "RestApiId": {
+     "Ref": "PrereqAPI98B5AA89"
+    }
+   },
+   "DependsOn": [
+    "PrereqAPIproxyANY599A96EE",
+    "PrereqAPIproxyOPTIONS65BFDD3C",
+    "PrereqAPIproxy4420EC9C",
+    "PrereqAPIANY19022641",
+    "PrereqAPIOPTIONS3CD5BC7B"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "PrereqAPIDeploymentStagedev65A9CF93": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "AccessLogSetting": {
+     "DestinationArn": {
+      "Fn::GetAtt": [
+       "PrereqApiLogsB9F94A22",
+       "Arn"
+      ]
+     },
+     "Format": "{\"requestId\":\"$context.requestId\",\"ip\":\"$context.identity.sourceIp\",\"user\":\"$context.identity.user\",\"caller\":\"$context.identity.caller\",\"requestTime\":\"$context.requestTime\",\"httpMethod\":\"$context.httpMethod\",\"resourcePath\":\"$context.resourcePath\",\"status\":\"$context.status\",\"protocol\":\"$context.protocol\",\"responseLength\":\"$context.responseLength\"}"
+    },
+    "DeploymentId": {
+     "Ref": "PrereqAPIDeployment956D52201e01013ff02ad5abed396d795d3f7e75"
+    },
+    "MethodSettings": [
+     {
+      "DataTraceEnabled": false,
+      "HttpMethod": "*",
+      "LoggingLevel": "INFO",
+      "MetricsEnabled": true,
+      "ResourcePath": "/*"
+     }
+    ],
+    "RestApiId": {
+     "Ref": "PrereqAPI98B5AA89"
+    },
+    "StageName": "dev"
+   },
+   "DependsOn": [
+    "PrereqAPIAccount4B1D4FD2"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/DeploymentStage.dev/Resource"
+   }
+  },
+  "PrereqAPIOPTIONS3CD5BC7B": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "PrereqAPI98B5AA89",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "PrereqAPI98B5AA89"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Default/OPTIONS/Resource"
+   }
+  },
+  "PrereqAPIproxy4420EC9C": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "PrereqAPI98B5AA89",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "{proxy+}",
+    "RestApiId": {
+     "Ref": "PrereqAPI98B5AA89"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Default/{proxy+}/Resource"
+   }
+  },
+  "PrereqAPIproxyOPTIONS65BFDD3C": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "PrereqAPIproxy4420EC9C"
+    },
+    "RestApiId": {
+     "Ref": "PrereqAPI98B5AA89"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Default/{proxy+}/OPTIONS/Resource"
+   }
+  },
+  "PrereqAPIproxyANYApiPermissionPREREQPrereqAPI636ACF36ANYproxy618B61D4": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "PrereqAPILambda69775152",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:us-east-2:911167926050:",
+       {
+        "Ref": "PrereqAPI98B5AA89"
+       },
+       "/",
+       {
+        "Ref": "PrereqAPIDeploymentStagedev65A9CF93"
+       },
+       "/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Default/{proxy+}/ANY/ApiPermission.PREREQPrereqAPI636ACF36.ANY..{proxy+}"
+   }
+  },
+  "PrereqAPIproxyANYApiPermissionTestPREREQPrereqAPI636ACF36ANYproxy3E0A2E61": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "PrereqAPILambda69775152",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:us-east-2:911167926050:",
+       {
+        "Ref": "PrereqAPI98B5AA89"
+       },
+       "/test-invoke-stage/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Default/{proxy+}/ANY/ApiPermission.Test.PREREQPrereqAPI636ACF36.ANY..{proxy+}"
+   }
+  },
+  "PrereqAPIproxyANY599A96EE": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:us-east-2:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "PrereqAPILambda69775152",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "PrereqAPIproxy4420EC9C"
+    },
+    "RestApiId": {
+     "Ref": "PrereqAPI98B5AA89"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Default/{proxy+}/ANY/Resource"
+   }
+  },
+  "PrereqAPIANY19022641": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "Type": "MOCK"
+    },
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "PrereqAPI98B5AA89",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "PrereqAPI98B5AA89"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqAPI/Default/ANY/Resource"
+   }
+  },
+  "PrereqFrontendBucket0844C2B3": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketName": "prereq-frontend-dev-911167926050-us-east-2",
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "Tags": [
+     {
+      "Key": "aws-cdk:auto-delete-objects",
+      "Value": "true"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqFrontendBucket/Resource"
+   }
+  },
+  "PrereqFrontendBucketPolicy09ED00D8": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "PrereqFrontendBucket0844C2B3"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:PutBucketPolicy",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:DeleteObject*"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::GetAtt": [
+          "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+          "Arn"
+         ]
+        }
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "PrereqFrontendBucket0844C2B3",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "PrereqFrontendBucket0844C2B3",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "CanonicalUser": {
+         "Fn::GetAtt": [
+          "PrereqOAI36372E6F",
+          "S3CanonicalUserId"
+         ]
+        }
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "PrereqFrontendBucket0844C2B3",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "PrereqFrontendBucket0844C2B3",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:GetObject",
+       "Effect": "Allow",
+       "Principal": {
+        "CanonicalUser": {
+         "Fn::GetAtt": [
+          "PrereqOAI36372E6F",
+          "S3CanonicalUserId"
+         ]
+        }
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "PrereqFrontendBucket0844C2B3",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqFrontendBucket/Policy/Resource"
+   }
+  },
+  "PrereqFrontendBucketAutoDeleteObjectsCustomResourceC76FC379": {
+   "Type": "Custom::S3AutoDeleteObjects",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+      "Arn"
+     ]
+    },
+    "BucketName": {
+     "Ref": "PrereqFrontendBucket0844C2B3"
+    }
+   },
+   "DependsOn": [
+    "PrereqFrontendBucketPolicy09ED00D8"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqFrontendBucket/AutoDeleteObjectsCustomResource/Default"
+   }
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/Custom::S3AutoDeleteObjectsCustomResourceProvider/Role"
+   }
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-911167926050-us-east-2",
+     "S3Key": "faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Lambda function for auto-deleting objects in ",
+       {
+        "Ref": "PrereqFrontendBucket0844C2B3"
+       },
+       " S3 bucket."
+      ]
+     ]
+    }
+   },
+   "DependsOn": [
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler",
+    "aws:asset:path": "asset.faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6",
+    "aws:asset:property": "Code"
+   }
+  },
+  "PrereqOAI36372E6F": {
+   "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity",
+   "Properties": {
+    "CloudFrontOriginAccessIdentityConfig": {
+     "Comment": "OAI for PREREQ frontend bucket"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqOAI/Resource"
+   }
+  },
+  "PrereqDistribution5689E978": {
+   "Type": "AWS::CloudFront::Distribution",
+   "Properties": {
+    "DistributionConfig": {
+     "CustomErrorResponses": [
+      {
+       "ErrorCachingMinTTL": 0,
+       "ErrorCode": 404,
+       "ResponseCode": 200,
+       "ResponsePagePath": "/index.html"
+      },
+      {
+       "ErrorCachingMinTTL": 0,
+       "ErrorCode": 403,
+       "ResponseCode": 200,
+       "ResponsePagePath": "/index.html"
+      }
+     ],
+     "DefaultCacheBehavior": {
+      "AllowedMethods": [
+       "GET",
+       "HEAD",
+       "OPTIONS",
+       "PUT",
+       "PATCH",
+       "POST",
+       "DELETE"
+      ],
+      "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+      "CachedMethods": [
+       "GET",
+       "HEAD",
+       "OPTIONS"
+      ],
+      "Compress": true,
+      "TargetOriginId": "PREREQPrereqDistributionOrigin1B75B3204",
+      "ViewerProtocolPolicy": "redirect-to-https"
+     },
+     "DefaultRootObject": "index.html",
+     "Enabled": true,
+     "HttpVersion": "http2",
+     "IPV6Enabled": true,
+     "Origins": [
+      {
+       "DomainName": {
+        "Fn::GetAtt": [
+         "PrereqFrontendBucket0844C2B3",
+         "RegionalDomainName"
+        ]
+       },
+       "Id": "PREREQPrereqDistributionOrigin1B75B3204",
+       "S3OriginConfig": {
+        "OriginAccessIdentity": {
+         "Fn::Join": [
+          "",
+          [
+           "origin-access-identity/cloudfront/",
+           {
+            "Ref": "PrereqOAI36372E6F"
+           }
+          ]
+         ]
+        }
+       }
+      }
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/PrereqDistribution/Resource"
+   }
+  },
+  "DatabaseEndpointParamEEE48753": {
+   "Type": "AWS::SSM::Parameter",
+   "Properties": {
+    "Description": "RDS Database Endpoint (dev)",
+    "Name": "/prereq/dev/database/endpoint",
+    "Type": "String",
+    "Value": {
+     "Fn::GetAtt": [
+      "PrereqDatabase4F1D7173",
+      "Endpoint.Address"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/DatabaseEndpointParam/Resource"
+   }
+  },
+  "DatabaseSecretArnParamE8647410": {
+   "Type": "AWS::SSM::Parameter",
+   "Properties": {
+    "Description": "RDS Database Secret ARN (dev)",
+    "Name": "/prereq/dev/database/secret-arn",
+    "Type": "String",
+    "Value": {
+     "Ref": "PrereqDatabaseSecretAttachment783A7E20"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/DatabaseSecretArnParam/Resource"
+   }
+  },
+  "JwtSecretArnParam8A49B73A": {
+   "Type": "AWS::SSM::Parameter",
+   "Properties": {
+    "Description": "JWT Secret ARN (dev)",
+    "Name": "/prereq/dev/jwt/secret-arn",
+    "Type": "String",
+    "Value": {
+     "Ref": "JwtSecretB8834B39"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/JwtSecretArnParam/Resource"
+   }
+  },
+  "CognitoUserPoolIdParam26C934B6": {
+   "Type": "AWS::SSM::Parameter",
+   "Properties": {
+    "Description": "Cognito User Pool ID (dev)",
+    "Name": "/prereq/dev/cognito/user-pool-id",
+    "Type": "String",
+    "Value": {
+     "Ref": "PrereqUserPool73A41AD9"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/CognitoUserPoolIdParam/Resource"
+   }
+  },
+  "CognitoClientIdParam3716DA97": {
+   "Type": "AWS::SSM::Parameter",
+   "Properties": {
+    "Description": "Cognito User Pool Client ID (dev)",
+    "Name": "/prereq/dev/cognito/client-id",
+    "Type": "String",
+    "Value": {
+     "Ref": "PrereqUserPoolClientFC10A44C"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/CognitoClientIdParam/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31UXW/bMAz8LX1XtS7dgL0mzloEWFEj6fpa0DLjsLUlQ6TaBYb/+yDLTry22JPujieKH4kXenH1TV9dwBtfmvLlsqZCdzsB86LgjZ86NAvdPbZGZXv7mGcqD0VNZhcKixK1M9q6IPgARY1n/awtmZ0hEHL2ZFa5p1cQPOfYWEFvUW5B8A2O46MjW4qAOTRoRY3KY2t+2rJ1ZGW0nuiQaQ8G554dmuBJjrfehXao8r/CxlYemXvlS9bdGgQKYNxYFrAGVSr7dHW9mguTe4fGp97Wq+lmr3hQuQELFXrdpZejMR0P4CuUWcMnw4fI1skw1Z05YBnS8D9oW2QXvMHc1WSGsb5TUvLp3kh7xdDobG+XbVuTSaEamqIE3d0Ea6KwAkY1kZh5jnP0DTGTs70yrrIkTne/GX3uXB0NJzyBrKax33+VXhE0utu6qcMa1bmbhHrF10/AjMJ6GQ/F17pbBfOCMpSZYLwwonSc88x5r2pXse5+ueq04wn3Clqq0o9Qd1tkWbY0jnWCS2NcsKLW2NbuOG1xxnYCVfqvDGDayFDpHcrBlTE4oty7P8fJMl9gr0ztQrn3zoru7j1VFJ9G5k2JVkiGxrLouYmeTx1rYvFUhGlvc94r5iZ+EzzZKgcPDQr6YeoT6Xs1L+0O2pZspYYdxOYiyfb2PkgbRGWBxTWf9fIulHv3SiX6OJFeWVeifuYvr19/6MWV/n7xzESXPlihBvU2nX8BV5rFA88EAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "PREREQ/CDKMetadata/Default"
+   }
+  }
+ },
+ "Mappings": {
+  "PrereqDatabaseRotationSingleUserSARMappingCA03BAF2": {
+   "aws": {
+    "applicationId": "arn:aws:serverlessrepo:us-east-1:297356227824:applications/SecretsManagerRDSPostgreSQLRotationSingleUser",
+    "semanticVersion": "1.1.367"
+   },
+   "aws-cn": {
+    "applicationId": "arn:aws-cn:serverlessrepo:cn-north-1:193023089310:applications/SecretsManagerRDSPostgreSQLRotationSingleUser",
+    "semanticVersion": "1.1.237"
+   },
+   "aws-us-gov": {
+    "applicationId": "arn:aws-us-gov:serverlessrepo:us-gov-west-1:023102451235:applications/SecretsManagerRDSPostgreSQLRotationSingleUser",
+    "semanticVersion": "1.1.213"
+   }
+  }
+ },
+ "Outputs": {
+  "PrereqAPIEndpoint5F9D9F82": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "PrereqAPI98B5AA89"
+      },
+      ".execute-api.us-east-2.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "PrereqAPIDeploymentStagedev65A9CF93"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "Environment": {
+   "Description": "Deployment environment",
+   "Value": "dev"
+  },
+  "DatabaseConfiguration": {
+   "Description": "Database access configuration",
+   "Value": "Public database (direct access)"
+  },
+  "ThrottlingConfiguration": {
+   "Description": "API Gateway throttling limits",
+   "Value": "Unlimited"
+  },
+  "WAFProtection": {
+   "Description": "WAF protection status",
+   "Value": "Disabled"
+  },
+  "DatabaseEndpoint": {
+   "Description": "Direct database endpoint",
+   "Value": {
+    "Fn::GetAtt": [
+     "PrereqDatabase4F1D7173",
+     "Endpoint.Address"
+    ]
+   }
+  },
+  "UserPoolId": {
+   "Description": "Cognito User Pool ID",
+   "Value": {
+    "Ref": "PrereqUserPool73A41AD9"
+   }
+  },
+  "UserPoolClientId": {
+   "Description": "Cognito User Pool Client ID",
+   "Value": {
+    "Ref": "PrereqUserPoolClientFC10A44C"
+   }
+  },
+  "ApiUrl": {
+   "Description": "API Gateway URL",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "PrereqAPI98B5AA89"
+      },
+      ".execute-api.us-east-2.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "PrereqAPIDeploymentStagedev65A9CF93"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "FrontendUrl": {
+   "Description": "CloudFront Distribution URL",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Fn::GetAtt": [
+        "PrereqDistribution5689E978",
+        "DomainName"
+       ]
+      }
+     ]
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

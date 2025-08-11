@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id        String          @id @default(cuid())
+  id        String          @id @default(uuid())
   email     String          @unique
   fullName  String?
   cognitoId String          @unique @map("cognito_id")
@@ -20,7 +20,7 @@ model User {
 }
 
 model Project {
-  id           String          @id @default(cuid())
+  id           String          @id @default(uuid())
   name         String
   client       String?
   startDate    DateTime        @map("start_date")
@@ -36,37 +36,39 @@ model Project {
 }
 
 model Task {
-  id               String           @id @default(cuid())
-  projectId        String           @map("project_id")
-  parentId         String?          @map("parent_id")
-  level            Int              @default(0)
-  wbsCode          String           @map("wbs_code")
-  title            String
-  description      String?
-  startDate        DateTime         @map("start_date")
-  endDate          DateTime         @map("end_date")
-  isMilestone      Boolean          @default(false) @map("is_milestone")
-  isManualFinish   Boolean          @default(false) @map("is_manual_finish")
-  manualFinishDate DateTime?        @map("manual_finish_date")
-  resourceRole     String?          @map("resource_role")
-  resourceQty      Float?           @map("resource_qty")
-  resourceUnit     String?          @map("resource_unit")
-  roleHours        Json?            @map("role_hours")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
-  totalCost        Decimal          @default(0) @map("total_cost") @db.Money
-  costLabor        Decimal          @default(0) @map("cost_labor") @db.Money
-  costMaterial     Decimal          @default(0) @map("cost_material") @db.Money
-  costOther        Decimal          @default(0) @map("cost_other") @db.Money
-  activityId       String           @unique @map("activity_id")
-  successors       TaskRelation[]   @relation("successors")
-  predecessors     TaskRelation[]   @relation("predecessors")
-  parent           Task?            @relation("TaskHierarchy", fields: [parentId], references: [id])
-  children         Task[]           @relation("TaskHierarchy")
-  project          Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  dependenciesFrom TaskDependency[]    @relation("DependencyPredecessor")
-  dependenciesTo   TaskDependency[]    @relation("DependencySuccessor")
+  id                  String               @id @default(uuid())
+  projectId           String               @map("project_id")
+  parentId            String?              @map("parent_id")
+  level               Int                  @default(0)
+  wbsCode             String               @map("wbs_code")
+  title               String
+  description         String?
+  startDate           DateTime             @map("start_date")
+  endDate             DateTime             @map("end_date")
+  isMilestone         Boolean              @default(false) @map("is_milestone")
+  isManualFinish      Boolean              @default(false) @map("is_manual_finish")
+  manualFinishDate    DateTime?            @map("manual_finish_date")
+  resourceRole        String?              @map("resource_role")
+  resourceQty         Float?               @map("resource_qty")
+  resourceUnit        String?              @map("resource_unit")
+  roleHours           Json?                @map("role_hours")
+  isHeader            Boolean              @default(false) @map("is_header")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  totalCost           Decimal              @default(0) @map("total_cost") @db.Money
+  costLabor           Decimal              @default(0) @map("cost_labor") @db.Money
+  costMaterial        Decimal              @default(0) @map("cost_material") @db.Money
+  costOther           Decimal              @default(0) @map("cost_other") @db.Money
+  activityId          String               @unique @map("activity_id")
+  code                String?              @unique @db.VarChar(16)
   resourceAssignments ResourceAssignment[]
+  dependenciesFrom    TaskDependency[]     @relation("DependencyPredecessor")
+  dependenciesTo      TaskDependency[]     @relation("DependencySuccessor")
+  successors          TaskRelation[]       @relation("successors")
+  predecessors        TaskRelation[]       @relation("predecessors")
+  parent              Task?                @relation("TaskHierarchy", fields: [parentId], references: [id], onUpdate: NoAction)
+  children            Task[]               @relation("TaskHierarchy")
+  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, wbsCode])
   @@index([projectId])
@@ -78,7 +80,7 @@ model Task {
 }
 
 model TaskRelation {
-  id            String       @id @default(cuid())
+  id            String       @id @default(uuid())
   predecessorId String       @map("predecessor_id")
   successorId   String       @map("successor_id")
   type          RelationType
@@ -92,7 +94,7 @@ model TaskRelation {
 }
 
 model ProjectMember {
-  id        String     @id @default(cuid())
+  id        String     @id @default(uuid())
   userId    String     @map("user_id")
   projectId String     @map("project_id")
   role      MemberRole
@@ -107,11 +109,11 @@ model ProjectMember {
 }
 
 model TaskDependency {
-  id            String         @id @default(cuid())
+  id            String         @id @default(uuid())
   predecessorId String         @map("predecessor_id")
   successorId   String         @map("successor_id")
   type          DependencyType
-  lag           Int            @default(0) // Signed integer for days (can be negative)
+  lag           Int            @default(0)
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   predecessor   Task           @relation("DependencyPredecessor", fields: [predecessorId], references: [id], onDelete: Cascade)
@@ -124,7 +126,7 @@ model TaskDependency {
 }
 
 model ResourceType {
-  id        String     @id @default(cuid())
+  id        String     @id @default(uuid())
   name      String     @unique
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
@@ -134,28 +136,28 @@ model ResourceType {
 }
 
 model Resource {
-  id          String               @id @default(cuid())
+  id          String               @id @default(uuid())
   name        String
   rateFloat   Float                @map("rate_float")
   typeId      String               @map("type_id")
   createdAt   DateTime             @default(now()) @map("created_at")
   updatedAt   DateTime             @updatedAt @map("updated_at")
-  type        ResourceType         @relation(fields: [typeId], references: [id], onDelete: Cascade)
   assignments ResourceAssignment[]
+  type        ResourceType         @relation(fields: [typeId], references: [id], onDelete: Cascade)
 
   @@index([typeId])
   @@map("resources")
 }
 
 model ResourceAssignment {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid())
   taskId     String   @map("task_id")
   resourceId String   @map("resource_id")
   hours      Int
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, resourceId])
   @@index([taskId])
@@ -171,10 +173,10 @@ enum RelationType {
 }
 
 enum DependencyType {
-  FS // Finish-to-Start
-  SS // Start-to-Start
-  FF // Finish-to-Finish
-  SF // Start-to-Finish
+  FS
+  SS
+  FF
+  SF
 }
 
 enum MemberRole {

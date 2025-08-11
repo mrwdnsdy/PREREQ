@@ -217,6 +217,22 @@ export const ResourceDrawer: React.FC<ResourceDrawerProps> = ({
     setEditingDependency(null);
   }, [selectedTask?.id]);
 
+  // Auto-reset isAddingResource if form is abandoned (no activity for 30 seconds)
+  useEffect(() => {
+    if (!isAddingResource) return;
+    
+    const timeout = setTimeout(() => {
+      setIsAddingResource(false);
+      setNewResourceForm({
+        selectedTypeId: '',
+        selectedResources: [],
+        hours: 8,
+      });
+    }, 30000); // 30 seconds
+    
+    return () => clearTimeout(timeout);
+  }, [isAddingResource]);
+
   // Reset resource selection when type changes
   useEffect(() => {
     setNewResourceForm(prev => ({
@@ -594,7 +610,12 @@ export const ResourceDrawer: React.FC<ResourceDrawerProps> = ({
               {/* Selected Task Info */}
               <div className="bg-blue-50 p-3 border-b border-gray-200">
                 <h4 className="font-medium text-blue-900 mb-1">
-                  {selectedTask.activityId && (
+                  {selectedTask.code && (
+                    <span className="font-mono bg-blue-100 px-2 py-1 rounded mr-2 text-xs">
+                      {selectedTask.code}
+                    </span>
+                  )}
+                  {!selectedTask.code && selectedTask.activityId && (
                     <span className="font-mono bg-blue-100 px-2 py-1 rounded mr-2 text-xs">
                       {selectedTask.activityId}
                     </span>
@@ -639,7 +660,23 @@ export const ResourceDrawer: React.FC<ResourceDrawerProps> = ({
                         {/* Add Resource Form */}
                         {isAddingResource && (
                           <div className="bg-gray-50 p-4 rounded-lg border space-y-3">
-                            <h5 className="font-medium text-gray-900">Add Resource</h5>
+                            <div className="flex items-center justify-between">
+                              <h5 className="font-medium text-gray-900">Add Resource</h5>
+                              <button
+                                onClick={() => {
+                                  setIsAddingResource(false);
+                                  setNewResourceForm({
+                                    selectedTypeId: '',
+                                    selectedResources: [],
+                                    hours: 8,
+                                  });
+                                }}
+                                className="text-sm text-gray-500 hover:text-gray-700 underline"
+                                title="Reset form"
+                              >
+                                Reset
+                              </button>
+                            </div>
                             
                             {/* Resource Type Dropdown */}
                             <div>

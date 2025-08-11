@@ -381,6 +381,7 @@ export class P6ImportService {
           endDate: p6Task.end_date ? new Date(p6Task.end_date) : new Date(),
           isMilestone: p6Task.is_milestone || false,
           level: 1, // Will be calculated in second pass
+          isHeader: false, // Will be updated in third pass
         },
       });
       taskMap.set(p6Task.task_id, task.id);
@@ -413,6 +414,32 @@ export class P6ImportService {
       if (parentId) {
         await this.prisma.task.update({ where: { id: t.id }, data: { parentId } });
       }
+    }
+
+    // --- THIRD PASS: determine isHeader based on whether task has children ---
+    const tasksWithChildren = await this.prisma.task.findMany({
+      where: { projectId },
+      select: { id: true, parentId: true },
+    });
+
+    // Create a map of parent IDs to their children
+    const parentToChildren = new Map<string, string[]>();
+    for (const task of tasksWithChildren) {
+      if (task.parentId) {
+        if (!parentToChildren.has(task.parentId)) {
+          parentToChildren.set(task.parentId, []);
+        }
+        parentToChildren.get(task.parentId)!.push(task.id);
+      }
+    }
+
+    // Update isHeader for all tasks
+    for (const task of tasksWithChildren) {
+      const hasChildren = parentToChildren.has(task.id);
+      await this.prisma.task.update({
+        where: { id: task.id },
+        data: { isHeader: hasChildren },
+      });
     }
 
     return taskMap;
@@ -781,6 +808,7 @@ export class P6ImportService {
     // Generate unique activity IDs for all tasks upfront
     const activityIds = await this.generateBatchActivityIds(tasks.length);
     
+    // FIRST PASS - Create all tasks with temporary parent relationships
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       const activityId = activityIds[i];
@@ -821,6 +849,7 @@ export class P6ImportService {
           activityId,
           resourceRole: task.accountableDesignation,
           resourceQty: this.calculateTotalHours(task),
+          isHeader: false, // Will be updated in second pass
         },
       });
       
@@ -863,6 +892,32 @@ export class P6ImportService {
           data: { parentId },
         });
       }
+    }
+
+    // THIRD PASS – determine isHeader based on whether task has children
+    const tasksWithChildren = await this.prisma.task.findMany({
+      where: { projectId },
+      select: { id: true, parentId: true },
+    });
+
+    // Create a map of parent IDs to their children
+    const parentToChildren = new Map<string, string[]>();
+    for (const task of tasksWithChildren) {
+      if (task.parentId) {
+        if (!parentToChildren.has(task.parentId)) {
+          parentToChildren.set(task.parentId, []);
+        }
+        parentToChildren.get(task.parentId)!.push(task.id);
+      }
+    }
+
+    // Update isHeader for all tasks
+    for (const task of tasksWithChildren) {
+      const hasChildren = parentToChildren.has(task.id);
+      await this.prisma.task.update({
+        where: { id: task.id },
+        data: { isHeader: hasChildren },
+      });
     }
 
     return taskMap;

@@ -1,0 +1,522 @@
+{
+  "version": "45.0.0",
+  "artifacts": {
+    "PREREQ.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "PREREQ.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "PREREQ": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://911167926050/us-east-2",
+      "properties": {
+        "templateFile": "PREREQ.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::911167926050:role/cdk-hnb659fds-deploy-role-911167926050-us-east-2",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::911167926050:role/cdk-hnb659fds-cfn-exec-role-911167926050-us-east-2",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-911167926050-us-east-2/4ffffa9d851da332a5d85e670a53ae26b304bede0ede7bd2d049aed5ad61735b.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "PREREQ.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::911167926050:role/cdk-hnb659fds-lookup-role-911167926050-us-east-2",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "PREREQ.assets"
+      ],
+      "metadata": {
+        "/PREREQ/PrereqVPC/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPC60022FC8"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet1/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet1Subnet2E4E4EF2"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet1/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet1RouteTableF7EB1CC9"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet1/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet1RouteTableAssociationF71F9808"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet1/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet1DefaultRouteBB3BA430"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet2/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet2Subnet780B5677"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet2/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet2RouteTable3E4DB508"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet2/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet2RouteTableAssociation188F2712"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PublicSubnet2/DefaultRoute": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPublicSubnet2DefaultRoute56C6A38B"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PrivateSubnet1/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPrivateSubnet1Subnet5334BA66"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PrivateSubnet1/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPrivateSubnet1RouteTable98B2248D"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PrivateSubnet1/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPrivateSubnet1RouteTableAssociation9F00AE0C"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PrivateSubnet2/Subnet": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPrivateSubnet2Subnet4BA1B5F6"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PrivateSubnet2/RouteTable": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPrivateSubnet2RouteTable1574D2E6"
+          }
+        ],
+        "/PREREQ/PrereqVPC/PrivateSubnet2/RouteTableAssociation": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCPrivateSubnet2RouteTableAssociation827E55FE"
+          }
+        ],
+        "/PREREQ/PrereqVPC/IGW": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCIGW8C79008E"
+          }
+        ],
+        "/PREREQ/PrereqVPC/VPCGW": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCVPCGW2A8C09AF"
+          }
+        ],
+        "/PREREQ/PrereqVPC/S3Endpoint/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCS3Endpoint4EEAF792"
+          }
+        ],
+        "/PREREQ/PrereqVPC/SecretsEndpoint/SecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCSecretsEndpointSecurityGroup5EB16366"
+          }
+        ],
+        "/PREREQ/PrereqVPC/SecretsEndpoint/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqVPCSecretsEndpointA622CC86"
+          }
+        ],
+        "/PREREQ/PrereqLambdaSG/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqLambdaSGCF0C0BC3"
+          }
+        ],
+        "/PREREQ/PrereqDBSecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDBSecurityGroup4B9EF72E"
+          }
+        ],
+        "/PREREQ/PrereqDBSecurityGroup/from PREREQPrereqLambdaSG80D74A87:5432": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDBSecurityGroupfromPREREQPrereqLambdaSG80D74A875432B1C04B10"
+          }
+        ],
+        "/PREREQ/PrereqDBSecurityGroup/from PREREQPrereqDatabaseRotationSingleUserSecurityGroup01241D4E:{IndirectPort}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDBSecurityGroupfromPREREQPrereqDatabaseRotationSingleUserSecurityGroup01241D4EIndirectPortDB1836E5"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/SubnetGroup/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabaseSubnetGroup169D822F"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/Secret/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PREREQPrereqDatabaseSecret455AF0EA3fdaad7efa858a3daf9490cf0a702aeb"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/Secret/Attachment/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabaseSecretAttachment783A7E20"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/Secret/Attachment/RotationSchedule/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabaseSecretAttachmentRotationSchedule7279BA51"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/Secret/Attachment/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabaseSecretAttachmentPolicyAB8AB012"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabase4F1D7173"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/RotationSingleUser/SecurityGroup/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabaseRotationSingleUserSecurityGroupBA4B58CF"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/RotationSingleUser/SARMapping": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabaseRotationSingleUserSARMappingCA03BAF2"
+          }
+        ],
+        "/PREREQ/PrereqDatabase/RotationSingleUser/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDatabaseRotationSingleUserD1A2D905"
+          }
+        ],
+        "/PREREQ/JwtSecret/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "JwtSecretB8834B39"
+          }
+        ],
+        "/PREREQ/PrereqUserPool/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqUserPool73A41AD9"
+          }
+        ],
+        "/PREREQ/PrereqUserPoolClient/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqUserPoolClientFC10A44C"
+          }
+        ],
+        "/PREREQ/PrereqAPILambda/ServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPILambdaServiceRoleE1EEEA3F"
+          }
+        ],
+        "/PREREQ/PrereqAPILambda/ServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPILambdaServiceRoleDefaultPolicy87E26CE1"
+          }
+        ],
+        "/PREREQ/PrereqAPILambda/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPILambda69775152"
+          }
+        ],
+        "/PREREQ/PrereqAPILambdaLogs/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPILambdaLogsC502D351"
+          }
+        ],
+        "/PREREQ/PrereqApiLogs/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqApiLogsB9F94A22"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPI98B5AA89"
+          }
+        ],
+        "/PREREQ/PrereqAPI/CloudWatchRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPICloudWatchRoleB9E75E1F"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Account": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIAccount4B1D4FD2"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Deployment/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIDeployment956D52201e01013ff02ad5abed396d795d3f7e75"
+          }
+        ],
+        "/PREREQ/PrereqAPI/DeploymentStage.dev/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIDeploymentStagedev65A9CF93"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Endpoint": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIEndpoint5F9D9F82"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Default/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIOPTIONS3CD5BC7B"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Default/{proxy+}/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIproxy4420EC9C"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Default/{proxy+}/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIproxyOPTIONS65BFDD3C"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Default/{proxy+}/ANY/ApiPermission.PREREQPrereqAPI636ACF36.ANY..{proxy+}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIproxyANYApiPermissionPREREQPrereqAPI636ACF36ANYproxy618B61D4"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Default/{proxy+}/ANY/ApiPermission.Test.PREREQPrereqAPI636ACF36.ANY..{proxy+}": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIproxyANYApiPermissionTestPREREQPrereqAPI636ACF36ANYproxy3E0A2E61"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Default/{proxy+}/ANY/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIproxyANY599A96EE"
+          }
+        ],
+        "/PREREQ/PrereqAPI/Default/ANY/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqAPIANY19022641"
+          }
+        ],
+        "/PREREQ/PrereqFrontendBucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqFrontendBucket0844C2B3"
+          }
+        ],
+        "/PREREQ/PrereqFrontendBucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqFrontendBucketPolicy09ED00D8"
+          }
+        ],
+        "/PREREQ/PrereqFrontendBucket/AutoDeleteObjectsCustomResource/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqFrontendBucketAutoDeleteObjectsCustomResourceC76FC379"
+          }
+        ],
+        "/PREREQ/Custom::S3AutoDeleteObjectsCustomResourceProvider": [
+          {
+            "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
+            "data": true
+          }
+        ],
+        "/PREREQ/Custom::S3AutoDeleteObjectsCustomResourceProvider/Role": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+          }
+        ],
+        "/PREREQ/Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F"
+          }
+        ],
+        "/PREREQ/PrereqOAI/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqOAI36372E6F"
+          }
+        ],
+        "/PREREQ/PrereqDistribution/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PrereqDistribution5689E978"
+          }
+        ],
+        "/PREREQ/DatabaseEndpointParam/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseEndpointParamEEE48753"
+          }
+        ],
+        "/PREREQ/DatabaseSecretArnParam/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseSecretArnParamE8647410"
+          }
+        ],
+        "/PREREQ/JwtSecretArnParam/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "JwtSecretArnParam8A49B73A"
+          }
+        ],
+        "/PREREQ/CognitoUserPoolIdParam/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CognitoUserPoolIdParam26C934B6"
+          }
+        ],
+        "/PREREQ/CognitoClientIdParam/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CognitoClientIdParam3716DA97"
+          }
+        ],
+        "/PREREQ/Environment": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "Environment"
+          }
+        ],
+        "/PREREQ/DatabaseConfiguration": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseConfiguration"
+          }
+        ],
+        "/PREREQ/ThrottlingConfiguration": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ThrottlingConfiguration"
+          }
+        ],
+        "/PREREQ/WAFProtection": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "WAFProtection"
+          }
+        ],
+        "/PREREQ/DatabaseEndpoint": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "DatabaseEndpoint"
+          }
+        ],
+        "/PREREQ/UserPoolId": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "UserPoolId"
+          }
+        ],
+        "/PREREQ/UserPoolClientId": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "UserPoolClientId"
+          }
+        ],
+        "/PREREQ/ApiUrl": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ApiUrl"
+          }
+        ],
+        "/PREREQ/FrontendUrl": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "FrontendUrl"
+          }
+        ],
+        "/PREREQ/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/PREREQ/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/PREREQ/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "PREREQ"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  },
+  "minimumCliVersion": "2.1020.2"
+}

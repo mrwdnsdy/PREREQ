@@ -1,8 +1,10 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import { Task } from '../hooks/useTasks'
 import { TaskRelation } from '../services/scheduleApi'
 import { DatePickerCell } from './DatePickerCell'
 import { ChevronRight, Plus, Trash2, Edit2, Copy, Scissors, ArrowRight, Eye, EyeOff } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { formatDate } from '../utils/dateFormat'
 
 interface TaskTableProps {
   tasks: Task[]
@@ -223,6 +225,222 @@ const BudgetCell: React.FC<BudgetCellProps> = ({ value, onChange, rollupValue, i
   )
 }
 
+// Memoized new row component
+const TaskTableNewRow = React.memo(function TaskTableNewRow({
+  afterTaskId,
+  columnVisibility,
+  showWbs,
+  onSave,
+  onCancel,
+  calculateEndDate,
+  cell,
+  isHeader: isHeaderProp // <-- add prop
+}: {
+  afterTaskId: string | undefined,
+  columnVisibility: any,
+  showWbs: boolean,
+  onSave: (row: any) => void,
+  onCancel: () => void,
+  calculateEndDate: (startDate: string, duration: number) => string,
+  cell: string,
+  isHeader: boolean // <-- add prop
+}) {
+  // Local state for new row
+  const [name, setName] = React.useState('');
+  const [duration, setDuration] = React.useState(1);
+  const [startDate, setStartDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [description, setDescription] = React.useState('');
+  const [isHeader, setIsHeader] = React.useState(isHeaderProp);
+
+  const handleSave = () => {
+    onSave({
+      name,
+      duration,
+      startDate,
+      description,
+      isHeader,
+      afterTaskId
+    });
+  };
+
+  return (
+    <tr className="bg-sky-50 border-l-4 border-sky-400">
+      {/* Task Name with WBS */}
+      <td className="py-1 px-2 text-left">
+        <div className="flex flex-col gap-1">
+          {showWbs && (
+            <div className="w-full px-2 py-1 text-sm font-mono bg-gray-50 border rounded text-gray-500">
+              Auto-generated
+            </div>
+          )}
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && name.trim()) {
+                e.preventDefault();
+                handleSave();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                onCancel();
+              }
+            }}
+            className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+            placeholder="Task name"
+            autoFocus
+          />
+        </div>
+      </td>
+      {columnVisibility.level && (
+        <td className={cell}>
+          <span className="text-sm text-gray-400">-</span>
+        </td>
+      )}
+      {columnVisibility.id && (
+        <td className={cell}>
+          <span className="text-sm font-mono text-gray-500 bg-gray-50 px-2 py-1 rounded">Auto-generated</span>
+        </td>
+      )}
+      {columnVisibility.description && (
+        <td className={cell}>
+          <input
+            type="text"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            className="w-full px-1 py-0.5 text-sm border rounded"
+            placeholder="Description"
+          />
+        </td>
+      )}
+      {columnVisibility.type && (
+        <td className={cell}>
+          <span className="text-gray-600 text-sm">{isHeader ? 'WBS Header' : 'Activity'}</span>
+        </td>
+      )}
+      {columnVisibility.plannedDuration && (
+        <td className={cell}>
+          <input
+            type="number"
+            value={duration}
+            onChange={e => setDuration(parseInt(e.target.value) || 1)}
+            className="w-full px-1 py-0.5 text-sm border rounded"
+          />
+        </td>
+      )}
+      {columnVisibility.startDate && (
+        <td className={cell}>
+          <DatePickerCell
+            value={startDate}
+            onChange={date => setStartDate(date)}
+          />
+        </td>
+      )}
+      {columnVisibility.finishDate && (
+        <td className={cell}>
+          {calculateEndDate(startDate, duration)}
+        </td>
+      )}
+      {columnVisibility.predecessor && (
+        <td className={cell}>
+          <span className="text-sm text-gray-400">-</span>
+        </td>
+      )}
+      {columnVisibility.successor && (
+        <td className={cell}>
+          <span className="text-sm text-gray-400">-</span>
+        </td>
+      )}
+      {columnVisibility.remainingDuration && (
+        <td className={cell}>
+          <span className="text-sm">{duration}d</span>
+        </td>
+      )}
+      {columnVisibility.baselineStartDate && (
+        <td className={cell}>
+          <span className="text-sm text-gray-400">-</span>
+        </td>
+      )}
+      {columnVisibility.baselineFinishDate && (
+        <td className={cell}>
+          <span className="text-sm text-gray-400">-</span>
+        </td>
+      )}
+      {columnVisibility.accountableOrganization && (
+        <td className={cell}>
+          <input type="text" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="Organization" />
+        </td>
+      )}
+      {columnVisibility.responsiblePersonnel && (
+        <td className={cell}>
+          <input type="text" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="Personnel" />
+        </td>
+      )}
+      {columnVisibility.projectManager && (
+        <td className={cell}>
+          <input type="text" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="PM" />
+        </td>
+      )}
+      {columnVisibility.flag && (
+        <td className={cell}>
+          <input type="text" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="Flag" />
+        </td>
+      )}
+      {columnVisibility.reasoning && (
+        <td className={cell}>
+          <input type="text" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="Reasoning" />
+        </td>
+      )}
+      {columnVisibility.juniorDesign && (
+        <td className={cell}>
+          <input type="number" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="0" />
+        </td>
+      )}
+      {columnVisibility.intermediateDesign && (
+        <td className={cell}>
+          <input type="number" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="0" />
+        </td>
+      )}
+      {columnVisibility.seniorDesign && (
+        <td className={cell}>
+          <input type="number" value={''} onChange={() => {}} className="w-full px-1 py-0.5 text-sm border rounded" placeholder="0" />
+        </td>
+      )}
+      {columnVisibility.budget && (
+        <td className={cell}>
+          <input
+            type="number"
+            value={0} // Budget is not editable in this new row mode
+            onChange={(e) => {}}
+            className="w-full px-1 py-0.5 text-sm border rounded"
+          />
+        </td>
+      )}
+      {columnVisibility.progress && (
+        <td className={cell}>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-sm">0%</span>
+          </div>
+        </td>
+      )}
+      <td className="py-1 px-2 text-right">
+        <button
+          onClick={handleSave}
+          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="ml-2 px-3 py-1 text-sm bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
+        >
+          Cancel
+        </button>
+      </td>
+    </tr>
+  );
+});
+
 export const TaskTable: React.FC<TaskTableProps> = ({
   tasks,
   allTasks,
@@ -244,6 +462,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   const [newRowState, setNewRowState] = useState<NewRowState>({
     isAdding: false,
+    afterTaskId: undefined,
     wbsPath: '',
     name: '',
     duration: 1,
@@ -303,6 +522,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     y: 0,
     column: null
   })
+
+  const headerMenuRef = useRef<HTMLDivElement>(null);
+  const [headerMenuAdjustedTop, setHeaderMenuAdjustedTop] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (headerContextMenu.visible && headerMenuRef.current) {
+      const menu = headerMenuRef.current;
+      const rect = menu.getBoundingClientRect();
+      const overflowBottom = rect.bottom - window.innerHeight;
+      if (overflowBottom > 0) {
+        setHeaderMenuAdjustedTop((headerContextMenu.y ?? 0) - overflowBottom - 8); // 8px padding
+      } else {
+        setHeaderMenuAdjustedTop(null);
+      }
+    }
+  }, [headerContextMenu]);
 
   // Toggle task collapse state
   const toggleCollapse = (taskId: string) => {
@@ -715,6 +950,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   }
 
   const handleAddRow = (afterTaskId?: string, isHeaderParam: boolean = true) => {
+    // Prevent adding a header under an activity (leaf) task
+    if (afterTaskId) {
+      const afterTask = tasks.find(t => t.id === afterTaskId);
+      if (afterTask && !afterTask.isHeader) {
+        toast.error('Cannot add a header or sub-header under an Activity. Only WBS Headers can have children.');
+        return;
+      }
+    }
     setNewRowState({
       isAdding: true,
       afterTaskId,
@@ -725,10 +968,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       budget: 0,
       isHeader: isHeaderParam,
       isChild: false // This is a sibling
-    })
-  }
+    });
+  };
 
   const handleAddChild = (parentTaskId: string, isHeaderParam: boolean) => {
+    // Prevent adding a header or sub-header under an activity (leaf) task
+    const parentTask = tasks.find(t => t.id === parentTaskId);
+    if (parentTask && !parentTask.isHeader) {
+      toast.error('Cannot add a header or sub-header under an Activity. Only WBS Headers can have children.');
+      return;
+    }
     setNewRowState({
       isAdding: true,
       afterTaskId: parentTaskId,
@@ -739,17 +988,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       budget: 0,
       isHeader: isHeaderParam,
       isChild: true // This is a child
-    })
-  }
+    });
+  };
 
-  const handleSaveNewRow = async () => {
+  // In TaskTable, update handleSaveNewRow to accept the new row data
+  const handleSaveNewRow = async (row: any) => {
     try {
       // Determine appropriate parentId based on isChild flag
-      let parentId: string | null = null
-      if (newRowState.afterTaskId) {
-        const afterTask = tasks.find(t => t.id === newRowState.afterTaskId)
+      let parentId: string | null = null;
+      if (row.afterTaskId) {
+        const afterTask = tasks.find(t => t.id === row.afterTaskId)
         if (afterTask) {
-          if (newRowState.isChild) {
+          if (row.isChild) {
             // This is a child of the afterTask
             parentId = afterTask.id
           } else {
@@ -758,22 +1008,19 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           }
         }
       }
-
-    const newTask: Partial<Task> = {
-        // Remove wbsPath - let backend generate it
-        name: newRowState.name || 'New Task',
-      duration: newRowState.duration,
-      startDate: newRowState.startDate,
-        endDate: calculateEndDate(newRowState.startDate, newRowState.duration),
-      budget: newRowState.budget,
+      const newTask: Partial<Task> = {
+        name: row.name || 'New Task',
+        title: row.name || 'New Task',
+        duration: row.duration,
+        startDate: row.startDate,
+        endDate: calculateEndDate(row.startDate, row.duration),
+        description: row.description,
         isMilestone: false,
         predecessors: [],
         parentId: parentId || undefined,
-        isHeader: newRowState.isHeader
+        isHeader: row.isHeader
       }
-
       await onAddTask(newTask)
-      
       setNewRowState({
         isAdding: false,
         wbsPath: '',
@@ -832,14 +1079,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return endDate.toISOString().split('T')[0]
   }
 
-  const formatDate = (dateInput: string | Date): string => {
-    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput
-    return date.toLocaleDateString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
-      year: 'numeric'
-    })
-  }
+
 
   const isEditing = (taskId: string, field: string) => 
     editingState.taskId === taskId && editingState.field === field
@@ -900,7 +1140,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           handleAddChild(contextMenu.taskId, true)
           break
         case 'add-activity':
-          // Child activity (leaf)
+          // Child activity (leaf) -- ensure this always adds as a child
           handleAddChild(contextMenu.taskId, false)
           break
         case 'edit':
@@ -938,294 +1178,28 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   }, [contextMenu.visible, headerContextMenu.visible])
 
   const renderNewRow = () => {
-    if (!newRowState.isAdding) return null
-
-    const isHeader = newRowState.isHeader
-
+    if (!newRowState.isAdding) return null;
     return (
-      <tr className="bg-sky-50 border-l-4 border-sky-400">
-        {/* Task Name with WBS */}
-        <td className="py-1 px-2 text-left">
-          <div className="flex flex-col gap-1">
-            {showWbs && (
-              <div className="w-full px-2 py-1 text-sm font-mono bg-gray-50 border rounded text-gray-500">
-                Auto-generated
-              </div>
-            )}
-            <input
-              type="text"
-              value={newRowState.name}
-              onChange={(e) => setNewRowState(prev => ({ ...prev, name: e.target.value }))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newRowState.name.trim()) {
-                  e.preventDefault()
-                  handleSaveNewRow()
-                } else if (e.key === 'Escape') {
-                  e.preventDefault()
-                  handleCancelNewRow()
-                }
-              }}
-              className="w-full rounded border px-2 py-1 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-              placeholder="Task name"
-              autoFocus
-            />
-          </div>
-        </td>
-
-        {/* Level */}
-        {columnVisibility.level && (
-          <td className={cell}>
-            <span className="text-sm text-gray-400">-</span>
-          </td>
-        )}
-
-        {/* Activity ID */}
-        {columnVisibility.id && (
-          <td className={cell}>
-            {isHeader ? (
-              <span className="text-sm text-gray-400">-</span>
-            ) : (
-              <span className="text-sm font-mono text-gray-500 bg-gray-50 px-2 py-1 rounded">
-                Auto-generated
-              </span>
-            )}
-          </td>
-        )}
-
-        {/* Description */}
-        {columnVisibility.description && (
-          <td className={cell}>
-            <input
-              type="text"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="Description"
-            />
-          </td>
-        )}
-
-        {/* Type */}
-        {columnVisibility.type && (
-          <td className={cell}>
-            <span className="text-gray-600 text-sm">{isHeader ? 'WBS Header' : 'Activity'}</span>
-          </td>
-        )}
-
-        {/* Planned Duration */}
-        {columnVisibility.plannedDuration && (
-          <td className={cell}>
-            <input
-              type="number"
-              value={newRowState.duration}
-              onChange={(e) => setNewRowState(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
-              className="w-full px-1 py-0.5 text-sm border rounded"
-            />
-          </td>
-        )}
-
-        {/* Start Date */}
-        {columnVisibility.startDate && (
-          <td className={cell}>
-            <DatePickerCell
-              value={newRowState.startDate}
-              onChange={(date) => setNewRowState(prev => ({ ...prev, startDate: date }))}
-            />
-          </td>
-        )}
-
-        {/* Finish Date */}
-        {columnVisibility.finishDate && (
-          <td className={cell}>
-            {calculateEndDate(newRowState.startDate, newRowState.duration)}
-          </td>
-        )}
-
-        {/* Predecessor */}
-        {columnVisibility.predecessor && (
-          <td className={cell}>
-            <span className="text-sm text-gray-400">-</span>
-          </td>
-        )}
-
-        {/* Successor */}
-        {columnVisibility.successor && (
-          <td className={cell}>
-            <span className="text-sm text-gray-400">-</span>
-          </td>
-        )}
-
-        {/* Remaining Duration */}
-        {columnVisibility.remainingDuration && (
-          <td className={cell}>
-            <span className="text-sm">{newRowState.duration}d</span>
-          </td>
-        )}
-
-        {/* Baseline Start Date */}
-        {columnVisibility.baselineStartDate && (
-          <td className={cell}>
-            <span className="text-sm text-gray-400">-</span>
-          </td>
-        )}
-
-        {/* Baseline Finish Date */}
-        {columnVisibility.baselineFinishDate && (
-          <td className={cell}>
-            <span className="text-sm text-gray-400">-</span>
-          </td>
-        )}
-
-        {/* Accountable Organization */}
-        {columnVisibility.accountableOrganization && (
-          <td className={cell}>
-            <input
-              type="text"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="Organization"
-            />
-          </td>
-        )}
-
-        {/* Responsible Personnel */}
-        {columnVisibility.responsiblePersonnel && (
-          <td className={cell}>
-            <input
-              type="text"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="Personnel"
-            />
-          </td>
-        )}
-
-        {/* Project Manager */}
-        {columnVisibility.projectManager && (
-          <td className={cell}>
-            <input
-              type="text"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="PM"
-            />
-          </td>
-        )}
-
-        {/* Flag */}
-        {columnVisibility.flag && (
-          <td className={cell}>
-            <input
-              type="text"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="Flag"
-            />
-          </td>
-        )}
-
-        {/* Reasoning */}
-        {columnVisibility.reasoning && (
-          <td className={cell}>
-            <input
-              type="text"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="Reasoning"
-            />
-          </td>
-        )}
-
-        {/* Junior Design */}
-        {columnVisibility.juniorDesign && (
-          <td className={cell}>
-            <input
-              type="number"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="0"
-            />
-          </td>
-        )}
-
-        {/* Intermediate Design */}
-        {columnVisibility.intermediateDesign && (
-          <td className={cell}>
-            <input
-              type="number"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="0"
-            />
-          </td>
-        )}
-
-        {/* Senior Design */}
-        {columnVisibility.seniorDesign && (
-          <td className={cell}>
-            <input
-              type="number"
-              value=""
-              className="w-full px-1 py-0.5 text-sm border rounded"
-              placeholder="0"
-            />
-          </td>
-        )}
-
-        {/* Budget */}
-        {columnVisibility.budget && (
-          <td className={cell}>
-            <input
-              type="number"
-              value={newRowState.budget}
-              onChange={(e) => setNewRowState(prev => ({ ...prev, budget: parseFloat(e.target.value) || 0 }))}
-              className="w-full px-1 py-0.5 text-sm border rounded"
-            />
-          </td>
-        )}
-
-        {/* Progress % */}
-        {columnVisibility.progress && (
-          <td className={cell}>
-            <div className="flex items-center gap-1 justify-center">
-              <span className="text-sm">0%</span>
-            </div>
-          </td>
-        )}
-      </tr>
-    )
-  }
+      <TaskTableNewRow
+        afterTaskId={newRowState.afterTaskId}
+        columnVisibility={columnVisibility}
+        showWbs={showWbs}
+        onSave={(row) => handleSaveNewRow({ ...newRowState, ...row })}
+        onCancel={handleCancelNewRow}
+        calculateEndDate={calculateEndDate}
+        cell={cell}
+        isHeader={newRowState.isHeader} // <-- pass prop
+      />
+    );
+  };
 
   return (
     <div className="h-full overflow-auto">
-      <table className="w-full table-auto min-w-[1600px] border-collapse border border-gray-200">
-        <colgroup>
-          <col className="w-80" /> {/* WBS/Task Name - wider for hierarchy */}
-          {columnVisibility.level && <col className="w-16" />} {/* Level */}
-          {columnVisibility.id && <col className="w-20" />} {/* ID */}
-          {columnVisibility.description && <col className="w-48" />} {/* Description */}
-          {columnVisibility.type && <col className="w-24" />} {/* Type */}
-          {columnVisibility.plannedDuration && <col className="w-20" />} {/* Planned Duration */}
-          {columnVisibility.startDate && <col className="w-28" />} {/* Start Date */}
-          {columnVisibility.finishDate && <col className="w-28" />} {/* Finish Date */}
-          {columnVisibility.predecessor && <col className="w-24" />} {/* Predecessor */}
-          {columnVisibility.successor && <col className="w-24" />} {/* Successor */}
-          {columnVisibility.remainingDuration && <col className="w-20" />} {/* Remaining Duration */}
-          {columnVisibility.baselineStartDate && <col className="w-28" />} {/* Baseline Start Date */}
-          {columnVisibility.baselineFinishDate && <col className="w-28" />} {/* Baseline Finish Date */}
-          {columnVisibility.accountableOrganization && <col className="w-40" />} {/* Accountable Organization */}
-          {columnVisibility.responsiblePersonnel && <col className="w-40" />} {/* Responsible Personnel */}
-          {columnVisibility.projectManager && <col className="w-32" />} {/* Project Manager */}
-          {columnVisibility.flag && <col className="w-24" />} {/* Flag */}
-          {columnVisibility.reasoning && <col className="w-48" />} {/* Reasoning */}
-          {columnVisibility.juniorDesign && <col className="w-20" />} {/* Junior Design */}
-          {columnVisibility.intermediateDesign && <col className="w-20" />} {/* Intermediate Design */}
-          {columnVisibility.seniorDesign && <col className="w-20" />} {/* Senior Design */}
-          {columnVisibility.budget && <col className="w-24" />} {/* Budget */}
-          {columnVisibility.progress && <col className="w-20" />} {/* Progress */}
-        </colgroup>
+      <table className="w-full table-auto min-w-[2400px] border-collapse border border-gray-200">
+        <colgroup><col className="w-80" />{/* WBS/Task Name - wider for hierarchy */}{columnVisibility.level && <col className="w-16" />}{columnVisibility.id && <col className="w-20" />}{columnVisibility.description && <col className="w-48" />}{columnVisibility.type && <col className="w-24" />}{columnVisibility.plannedDuration && <col className="w-20" />}{columnVisibility.startDate && <col className="w-28" />}{columnVisibility.finishDate && <col className="w-28" />}{columnVisibility.predecessor && <col className="w-24" />}{columnVisibility.successor && <col className="w-24" />}{columnVisibility.remainingDuration && <col className="w-20" />}{columnVisibility.baselineStartDate && <col className="w-28" />}{columnVisibility.baselineFinishDate && <col className="w-28" />}{columnVisibility.accountableOrganization && <col className="w-40" />}{columnVisibility.responsiblePersonnel && <col className="w-40" />}{columnVisibility.projectManager && <col className="w-32" />}{columnVisibility.flag && <col className="w-24" />}{columnVisibility.reasoning && <col className="w-48" />}{columnVisibility.juniorDesign && <col className="w-20" />}{columnVisibility.intermediateDesign && <col className="w-20" />}{columnVisibility.seniorDesign && <col className="w-20" />}{columnVisibility.budget && <col className="w-24" />}{columnVisibility.progress && <col className="w-20" />}</colgroup>
         <thead>
           <tr className="bg-gray-50">
-            <th className={head}>
+            <th className={head} onContextMenu={(e) => handleHeaderRightClick(e, 'wbs')}>
               <div className="flex flex-col items-center justify-center">
                 <span className="font-semibold">WBS</span>
                 {onToggleWbs && (
@@ -1369,14 +1343,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   </td>
                 )}
 
-                {/* Activity ID */}
+                {/* Activity ID (now shows code) */}
                 {columnVisibility.id && (
                   <td className={`${cell} text-center`}>
                     {task.isHeader ? (
                       <span className="text-sm text-gray-400">-</span>
                     ) : (
                       <span className="text-xs font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
-                        {task.activityId}
+                        {task.code || task.activityId}
                       </span>
                     )}
                   </td>
@@ -1394,9 +1368,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 {/* Type */}
                 {columnVisibility.type && (
                   <td className={`${cell} text-center`}>
-                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
-                      {task.isMilestone ? 'Milestone' : task.isHeader ? 'WBS Header' : 'Activity'}
-                    </span>
+                    <select
+                      value={task.isHeader ? 'header' : 'activity'}
+                      onChange={e => onUpdateTask(task.id, { isHeader: e.target.value === 'header' })}
+                      className="px-2 py-1 rounded border text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="activity">Activity</option>
+                      <option value="header">WBS Header</option>
+                    </select>
                   </td>
                 )}
 
@@ -1421,37 +1400,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                 {/* Finish Date */}
                 {columnVisibility.finishDate && (
-                  <td className={`${cell} text-center`}>
-                    <DatePickerCell
-                      value={task.endDate}
-                      onChange={(date) => onUpdateTask(task.id, { endDate: date })}
-                    />
+                  <td className={cell}>
+                    {formatDate(calculateEndDate(task.startDate, task.duration))}
                   </td>
                 )}
 
                 {/* Predecessor */}
                 {columnVisibility.predecessor && (
                   <td className={`${cell} text-center`}>
-                    <span className="text-xs text-gray-600 font-mono truncate block" title={task.predecessors?.map(p => p.predecessor.activityId).join(', ') || ''}>
-                      {task.predecessors?.map(p => p.predecessor.activityId).join(', ') || '-'}
-                    </span>
+                    <span className="text-sm text-gray-400">-</span>
                   </td>
                 )}
 
                 {/* Successor */}
                 {columnVisibility.successor && (
                   <td className={`${cell} text-center`}>
-                    <span className="text-xs text-gray-600 font-mono truncate block" title={task.successors?.map(s => s.successor.activityId).join(', ') || ''}>
-                      {task.successors?.map(s => s.successor.activityId).join(', ') || '-'}
-                    </span>
+                    <span className="text-sm text-gray-400">-</span>
                   </td>
                 )}
 
                 {/* Remaining Duration */}
                 {columnVisibility.remainingDuration && (
                   <td className={`${cell} text-center`}>
-                    <span className="text-sm font-medium">
-                      {Math.max(0, (task.duration || 0) - Math.floor(((task.progress || 0) / 100) * (task.duration || 0)))}d
+                    <span className="text-sm">
+                      {task.duration}d
                     </span>
                   </td>
                 )}
@@ -1459,29 +1431,25 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 {/* Baseline Start Date */}
                 {columnVisibility.baselineStartDate && (
                   <td className={`${cell} text-center`}>
-                    <span className="text-sm text-gray-500">
-                      {task.baselineStartDate ? formatDate(task.baselineStartDate) : '-'}
-                    </span>
+                    <span className="text-sm text-gray-400">-</span>
                   </td>
                 )}
 
                 {/* Baseline Finish Date */}
                 {columnVisibility.baselineFinishDate && (
                   <td className={`${cell} text-center`}>
-                    <span className="text-sm text-gray-500">
-                      {task.baselineFinishDate ? formatDate(task.baselineFinishDate) : '-'}
-                    </span>
+                    <span className="text-sm text-gray-400">-</span>
                   </td>
                 )}
 
                 {/* Accountable Organization */}
                 {columnVisibility.accountableOrganization && (
-                  <td className={`${cell} text-center`}>
+                  <td className={`${cell} text-left`}>
                     <input
                       type="text"
                       value={task.accountableOrganization || ''}
-                      onChange={(e) => onUpdateTask(task.id, { accountableOrganization: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={e => onUpdateTask(task.id, { accountableOrganization: e.target.value })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="Organization"
                     />
                   </td>
@@ -1489,12 +1457,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                 {/* Responsible Personnel */}
                 {columnVisibility.responsiblePersonnel && (
-                  <td className={`${cell} text-center`}>
+                  <td className={`${cell} text-left`}>
                     <input
                       type="text"
                       value={task.responsiblePersonnel || ''}
-                      onChange={(e) => onUpdateTask(task.id, { responsiblePersonnel: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={e => onUpdateTask(task.id, { responsiblePersonnel: e.target.value })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="Personnel"
                     />
                   </td>
@@ -1502,12 +1470,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
                 {/* Project Manager */}
                 {columnVisibility.projectManager && (
-                  <td className={`${cell} text-center`}>
+                  <td className={`${cell} text-left`}>
                     <input
                       type="text"
                       value={task.projectManager || ''}
-                      onChange={(e) => onUpdateTask(task.id, { projectManager: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={e => onUpdateTask(task.id, { projectManager: e.target.value })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="PM"
                     />
                   </td>
@@ -1519,8 +1487,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     <input
                       type="text"
                       value={task.flag || ''}
-                      onChange={(e) => onUpdateTask(task.id, { flag: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={e => onUpdateTask(task.id, { flag: e.target.value })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="Flag"
                     />
                   </td>
@@ -1532,8 +1500,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     <input
                       type="text"
                       value={task.reasoning || ''}
-                      onChange={(e) => onUpdateTask(task.id, { reasoning: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={e => onUpdateTask(task.id, { reasoning: e.target.value })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="Reasoning"
                     />
                   </td>
@@ -1544,12 +1512,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   <td className={`${cell} text-center`}>
                     <input
                       type="number"
-                      value={task.juniorDesign || ''}
-                      onChange={(e) => onUpdateTask(task.id, { juniorDesign: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-2 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={task.juniorDesign || 0}
+                      onChange={e => onUpdateTask(task.id, { juniorDesign: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="0"
-                      min="0"
-                      step="0.1"
                     />
                   </td>
                 )}
@@ -1559,12 +1525,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   <td className={`${cell} text-center`}>
                     <input
                       type="number"
-                      value={task.intermediateDesign || ''}
-                      onChange={(e) => onUpdateTask(task.id, { intermediateDesign: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-2 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={task.intermediateDesign || 0}
+                      onChange={e => onUpdateTask(task.id, { intermediateDesign: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="0"
-                      min="0"
-                      step="0.1"
                     />
                   </td>
                 )}
@@ -1574,12 +1538,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   <td className={`${cell} text-center`}>
                     <input
                       type="number"
-                      value={task.seniorDesign || ''}
-                      onChange={(e) => onUpdateTask(task.id, { seniorDesign: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-2 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={task.seniorDesign || 0}
+                      onChange={e => onUpdateTask(task.id, { seniorDesign: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
                       placeholder="0"
-                      min="0"
-                      step="0.1"
                     />
                   </td>
                 )}
@@ -1587,145 +1549,82 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 {/* Budget */}
                 {columnVisibility.budget && (
                   <td className={`${cell} text-center`}>
-                    {canEditBudget(task) ? (
-                      <BudgetCell
-                        value={task.totalCost || 0}
-                        onChange={(value) => handleBudgetChange(task.id, value)}
-                        rollupValue={task.totalCost || 0}
-                        isRollup={!canEditBudget(task)}
-                      />
-                    ) : (
-                      <span className="text-sm font-medium text-gray-600">
-                        {formatCurrency(task.totalCost || 0)}
-                      </span>
-                    )}
+                    <BudgetCell
+                      value={task.totalCost || 0}
+                      onChange={(newBudget) => handleBudgetChange(task.id, newBudget)}
+                      rollupValue={calculateBudgetRollup(task)}
+                      isRollup={false}
+                    />
                   </td>
                 )}
 
-                {/* Progress % */}
+                {/* Progress */}
                 {columnVisibility.progress && (
                   <td className={`${cell} text-center`}>
-                    <div className="flex items-center justify-center gap-1">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={(task.progress ?? 0).toString()}
-                        onChange={(e) => {
-                          const cleaned = e.target.value.replace(/[^0-9]/g, '')
-                          const num = Math.max(0, Math.min(100, parseInt(cleaned || '0')))
-                          onUpdateTask(task.id, { progress: num })
-                        }}
-                        className="w-12 px-1 py-1 text-sm border rounded text-center focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <span className="text-sm text-gray-500">%</span>
-                    </div>
+                    <input
+                      type="number"
+                      value={task.progress || 0}
+                      onChange={e => onUpdateTask(task.id, { progress: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-1 py-0.5 text-sm border rounded"
+                      placeholder="0"
+                    />
                   </td>
                 )}
               </tr>
-              {newRowState.isAdding && newRowState.afterTaskId === task.id && renderNewRow()}
             </React.Fragment>
           ))}
+          {renderNewRow()}
         </tbody>
       </table>
-
-      {/* Context Menu */}
       {contextMenu.visible && (
         <div
-          className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50"
           style={{
+            position: 'fixed',
+            top: contextMenu.y,
             left: contextMenu.x,
-            top: contextMenu.y
+            zIndex: 1000,
+            background: 'white',
+            border: '1px solid #ccc',
+            borderRadius: 4,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            minWidth: 160,
+            padding: 0,
           }}
+          onContextMenu={e => e.preventDefault()}
         >
-          <button
-            onClick={() => handleContextMenuAction('add-header')}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            <Plus className="w-3 h-3" />
-            Add Header
-          </button>
-          <button
-            onClick={() => handleContextMenuAction('add-sub-header')}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            <ArrowRight className="w-3 h-3" />
-            Add Sub Header
-          </button>
-          <button
-            onClick={() => handleContextMenuAction('add-activity')}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            <ArrowRight className="w-3 h-3" />
-            Add Activity
-          </button>
-          <button
-            onClick={() => handleContextMenuAction('edit')}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            <Edit2 className="w-3 h-3" />
-            Edit
-          </button>
-          <button
-            onClick={() => handleContextMenuAction('copy')}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            <Copy className="w-3 h-3" />
-            Copy
-          </button>
-          <button
-            onClick={() => handleContextMenuAction('cut')}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
-          >
-            <Scissors className="w-3 h-3" />
-            Cut
-          </button>
-          <hr className="my-1" />
-          <button
-            onClick={() => handleContextMenuAction('delete')}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-          >
-            <Trash2 className="w-3 h-3" />
-            Delete
-          </button>
+          <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => handleContextMenuAction('add-header')}>Add Header</button>
+          <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => handleContextMenuAction('add-sub-header')}>Add Sub-header</button>
+          <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => handleContextMenuAction('add-activity')}>Add Activity</button>
+          <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => handleContextMenuAction('edit')}>Edit</button>
+          <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => handleContextMenuAction('delete')}>Delete</button>
         </div>
       )}
-
-      {/* Header Context Menu */}
+      
       {headerContextMenu.visible && (
         <div
-          className="fixed bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50"
+          ref={headerMenuRef}
           style={{
+            position: 'fixed',
+            top: headerMenuAdjustedTop ?? headerContextMenu.y,
             left: headerContextMenu.x,
-            top: headerContextMenu.y
+            zIndex: 1000,
+            background: 'white',
+            border: '1px solid #ccc',
+            borderRadius: 4,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            minWidth: 160,
+            padding: 0,
           }}
+          onContextMenu={e => e.preventDefault()}
         >
-          <div className="px-3 py-1 text-sm text-gray-500 border-b border-gray-200 mb-1">
-            Column: {headerContextMenu.column}
-          </div>
-          <button
+          <button 
+            className="block w-full text-left px-4 py-2 hover:bg-gray-100" 
             onClick={() => toggleColumnVisibility(headerContextMenu.column as keyof ColumnVisibility)}
-            className="w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2"
           >
-            <EyeOff className="w-3 h-3" />
-            Hide Column
+            {columnVisibility[headerContextMenu.column as keyof ColumnVisibility] ? 'Hide Column' : 'Show Column'}
           </button>
-          <hr className="my-1" />
-          <div className="px-3 py-1 text-sm text-gray-500">Show/Hide Columns:</div>
-          {Object.entries(columnVisibility).map(([key, visible]) => (
-            <button
-              key={key}
-              onClick={() => toggleColumnVisibility(key as keyof ColumnVisibility)}
-              className={`w-full text-left px-3 py-1 text-sm hover:bg-gray-100 flex items-center gap-2 ${
-                visible ? 'text-gray-900' : 'text-gray-400'
-              }`}
-            >
-              {visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-              {key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
-            </button>
-          ))}
         </div>
       )}
     </div>
   )
-} 
+}

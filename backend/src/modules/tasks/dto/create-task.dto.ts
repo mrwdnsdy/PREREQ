@@ -16,6 +16,11 @@ export class CreateTaskDto {
   @IsString()
   wbsCode?: string;
 
+  @ApiPropertyOptional({ description: 'Human-friendly code (A0001, A0002, ...). Auto-generated if not provided.' })
+  @IsOptional()
+  @IsString()
+  code?: string;
+
   @ApiProperty({ description: 'Task title' })
   @IsString()
   title: string;
@@ -37,6 +42,11 @@ export class CreateTaskDto {
   @IsOptional()
   @IsBoolean()
   isMilestone?: boolean;
+
+  @ApiPropertyOptional({ description: 'Is this a header task?' })
+  @IsOptional()
+  @IsBoolean()
+  isHeader?: boolean;
 
   @ApiPropertyOptional({ description: 'Labor cost' })
   @IsOptional()

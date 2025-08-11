@@ -14,53 +14,52 @@ export class TasksService {
 
   /**
    * Generate a sequential Activity ID in the classic "A####" format.
-   *   A0001, A0002, A0003 … – unique **within the project**.
-   * We keep the logic very simple:
-   *   1. Look up the task with the highest numeric suffix for this project.
-   *   2. Increment by 1 and left-pad to 4 digits.
-   *   3. Prepend the constant prefix "A".
-   *
-   * The level parameter is no longer used for ID generation, but we keep it in
-   * the signature to avoid changing the many call-sites.  Future improvements
-   * could decide to vary the length based on level, but for now we stick to the
-   * legacy behaviour the UI expects.
+   *   A0001, A0002, A0003 … – unique **globally**.
+   * This version fetches all activityIds, parses the numeric part, and finds the max across all tasks.
    */
-  private async generateUniqueActivityId(projectId?: string, _level?: number): Promise<string> {
-    if (!projectId) {
-      // Should never happen, but fall back to timestamp-based value.
-      return `A${Date.now().toString().slice(-4)}`;
-    }
-
-    // Get the highest existing numeric part for IDs that match the pattern "A####".
-    const lastTask = await this.prisma.task.findFirst({
+  private async generateUniqueActivityId(): Promise<string> {
+    // Fetch all activityIds that start with 'A' and are followed by digits
+    const tasks = await this.prisma.task.findMany({
       where: {
-        projectId,
         activityId: {
           startsWith: 'A',
           mode: 'insensitive',
         },
-        // Make sure the suffix is numeric – use regex for stricter matching.
-        // Prisma doesn't support full regex filters, so we'll sort and parse later.
-      },
-      orderBy: {
-        activityId: 'desc',
       },
       select: {
         activityId: true,
       },
     });
 
-    let nextNumber = 1;
-    if (lastTask?.activityId) {
-      const numericPart = parseInt(lastTask.activityId.replace(/[^0-9]/g, ''), 10);
-      if (!isNaN(numericPart)) {
-        nextNumber = numericPart + 1;
+    let maxNumber = 0;
+    for (const task of tasks) {
+      const match = /^A(\d+)$/.exec(task.activityId);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
       }
     }
 
-    // Left-pad to at least 4 digits (A0001 → A9999, then A10000, etc.)
+    const nextNumber = maxNumber + 1;
     const padded = nextNumber.toString().padStart(4, '0');
     return `A${padded}`;
+  }
+
+  /**
+   * Generate the next available human-friendly code (A0001, A0002, ...).
+   */
+  private async generateNextTaskCode(): Promise<string> {
+    const lastTask = await this.prisma.task.findFirst({
+      orderBy: { code: 'desc' },
+      select: { code: true },
+      where: { code: { startsWith: 'A' } },
+    });
+    if (!lastTask || !lastTask.code) return 'A0001';
+    const lastNum = parseInt(lastTask.code.replace(/^A/, ''), 10);
+    const nextNum = lastNum + 1;
+    return `A${nextNum.toString().padStart(4, '0')}`;
   }
 
   private calculateLevel(parentId: string | null, projectId: string): Promise<number> {
@@ -122,12 +121,11 @@ export class TasksService {
 
   private async generateUniqueWbsCode(projectId: string, parentId: string | null): Promise<string> {
     if (!parentId) {
-      // Root level task - find highest root number
+      // Root level task - find highest root number among all root tasks
       const rootTasks = await this.prisma.task.findMany({
         where: {
           projectId,
           parentId: null,
-          level: { gte: 1 } // Exclude level 0 project root
         },
         select: { wbsCode: true },
         orderBy: { wbsCode: 'desc' }
@@ -326,7 +324,7 @@ export class TasksService {
       });
 
       if (project) {
-        const activityId = await this.generateUniqueActivityId(projectId, 0);
+        const activityId = await this.generateUniqueActivityId();
         await this.prisma.task.create({
           data: {
             activityId,
@@ -391,7 +389,10 @@ export class TasksService {
     }
 
     // Generate unique Activity ID
-    const activityId = await this.generateUniqueActivityId(createTaskDto.projectId, level);
+    const activityId = await this.generateUniqueActivityId();
+
+    // Generate unique human-friendly code
+    const code = await this.generateNextTaskCode();
 
     // Calculate direct cost (with role hours if level 4+)
     const directCost = this.calculateDirectCost(
@@ -414,6 +415,7 @@ export class TasksService {
       parentId: createTaskDto.parentId || null,
       wbsCode, // Use server-generated or validated WBS code
       activityId,
+      code, // <-- new code field
       level,
       startDate: new Date(createTaskDto.startDate),
       endDate: new Date(createTaskDto.endDate),
@@ -421,6 +423,7 @@ export class TasksService {
       costMaterial: new Decimal(createTaskDto.costMaterial || 0),
       costOther: new Decimal(createTaskDto.costOther || 0),
       totalCost: directCost,
+      isHeader: createTaskDto.isHeader ?? false,
     };
     
     console.log('TasksService.create - Data to be saved to DB:', taskData);
@@ -606,6 +609,7 @@ export class TasksService {
         ...(updateTaskDto.costMaterial !== undefined && { costMaterial: new Decimal(updateTaskDto.costMaterial) }),
         ...(updateTaskDto.costOther !== undefined && { costOther: new Decimal(updateTaskDto.costOther) }),
         totalCost: newDirectCost,
+        ...(updateTaskDto.isHeader !== undefined && { isHeader: updateTaskDto.isHeader }),
       },
       include: {
         predecessors: {

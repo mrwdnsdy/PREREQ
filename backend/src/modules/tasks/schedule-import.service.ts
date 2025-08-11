@@ -237,6 +237,7 @@ export class ScheduleImportService {
 
     try {
       // Create the task
+      const code = await this.generateNextTaskCode();
       const task = await this.prisma.task.create({
         data: {
           activityId: activityId,
@@ -256,7 +257,8 @@ export class ScheduleImportService {
           resourceRole: resourceRole,
           resourceQty: resourceQty,
           resourceUnit: resourceQty ? 'hours/day' : null,
-          roleHours: roleHours
+          roleHours: roleHours,
+          code // <-- assign unique code
         }
       });
 
@@ -529,6 +531,19 @@ export class ScheduleImportService {
 
     // Final fallback
     return `TSK-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+  }
+
+  // Helper to generate the next available code (A0001, A0002, ...) for imported tasks
+  private async generateNextTaskCode(): Promise<string> {
+    const lastTask = await this.prisma.task.findFirst({
+      orderBy: { code: 'desc' },
+      select: { code: true },
+      where: { code: { startsWith: 'A' } },
+    });
+    if (!lastTask || !lastTask.code) return 'A0001';
+    const lastNum = parseInt(lastTask.code.replace(/^A/, ''), 10);
+    const nextNum = lastNum + 1;
+    return `A${nextNum.toString().padStart(4, '0')}`;
   }
 
   private async clearExistingTasks(projectId: string) {

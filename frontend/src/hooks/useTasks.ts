@@ -5,6 +5,7 @@ import api from '../services/api'
 // Backend task structure (what comes from API)
 interface BackendTask {
   id: string
+  code?: string // Human-friendly code like A0001, A0002, etc.
   activityId: string
   title: string
   wbsCode: string
@@ -50,11 +51,13 @@ interface BackendTask {
   children: BackendTask[]
   createdAt: string
   updatedAt: string
+  isHeader?: boolean // Added isHeader to BackendTask interface
 }
 
 // Frontend task structure (what TaskTable expects)
 export interface Task {
   id: string
+  code?: string // Human-friendly code like A0001, A0002, etc.
   activityId: string
   name: string
   title?: string // For backwards compatibility
@@ -135,6 +138,7 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
   
   return {
     id: backendTask.id,
+    code: backendTask.code, // Include the human-friendly code
     activityId: backendTask.activityId,
     name: backendTask.title,
     title: backendTask.title, // For backwards compatibility
@@ -167,8 +171,8 @@ const transformBackendTask = (backendTask: BackendTask): Task => {
     roleHours: backendTask.roleHours || {},
     // Task-level lag (could be derived from relationships)
     lag: 0,
-    // Determine header status: backend row is header when it has children
-    isHeader: (backendTask.children && backendTask.children.length > 0) || false
+    // Use backend isHeader directly
+    isHeader: backendTask.isHeader ?? false
   }
 }
 
@@ -227,6 +231,8 @@ export const useTasks = (projectId: string) => {
       if (updates.juniorDesign !== undefined) backendUpdates.juniorDesign = updates.juniorDesign
       if (updates.intermediateDesign !== undefined) backendUpdates.intermediateDesign = updates.intermediateDesign
       if (updates.seniorDesign !== undefined) backendUpdates.seniorDesign = updates.seniorDesign
+      // Add isHeader mapping for updates
+      if (updates.isHeader !== undefined) backendUpdates.isHeader = updates.isHeader
       
       console.log('useTasks: Backend updates:', backendUpdates)
       return api.patch(`/tasks/${taskId}`, backendUpdates)
