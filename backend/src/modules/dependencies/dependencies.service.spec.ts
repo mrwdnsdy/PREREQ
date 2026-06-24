@@ -61,8 +61,12 @@ describe('DependenciesService', () => {
     service = module.get<DependenciesService>(DependenciesService);
     prismaService = module.get<PrismaService>(PrismaService);
 
-    // Reset all mocks between tests to prevent interference
-    jest.clearAllMocks();
+    // Reset all mocks between tests to prevent interference.
+    // NOTE: use resetAllMocks (not clearAllMocks) so that unconsumed
+    // mockResolvedValueOnce() queue entries are also drained. clearAllMocks
+    // only clears call records, leaving queued *Once values to leak into
+    // later tests and corrupt their mock sequencing.
+    jest.resetAllMocks();
   });
 
   it('should be defined', () => {
