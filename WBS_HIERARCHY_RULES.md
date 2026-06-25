@@ -18,8 +18,10 @@ The WBS hierarchy validation ensures proper project structure by enforcing level
 - **Example**: A Level 3 task can only be created under a Level 2 parent, not directly under a Level 1 parent
 
 ### 3. WBS Code Validation
-- **Proper Format**: WBS codes must follow the hierarchical format (e.g., 1, 1.1, 1.1.1, 1.2, 2, 2.1)
-- **Parent Path Exists**: For a WBS path like "1.2.3", both "1" and "1.2" must exist
+- **Project Root**: Every project has a single Level 0 root task with WBS code `0`. All user-created tasks are nested beneath it.
+- **Proper Format**: WBS codes follow the hierarchical format prefixed by the `0` root (e.g., `0`, `0.1`, `0.1.1`, `0.2`, `0.2.1`). The first child of the root is `0.1`, its first child `0.1.1`, and so on.
+- **Parent Path Exists**: For a WBS path like `0.2.3`, both `0` and `0.2` must exist.
+- **Consistency**: Both task-creation paths — interactive (`POST /tasks`) and schedule import — produce this same 0-prefixed scheme.
 
 ## Implementation
 
@@ -65,18 +67,20 @@ Users receive clear error messages when validation fails:
 
 ## Examples
 
+_(The project Level 0 root `0` is created automatically; the items below are nested beneath it.)_
+
 ### ✅ Valid Hierarchy Creation Sequence
-1. Create "1 - Project Planning" (Level 1)
-2. Create "1.1 - Requirements" (Level 2, under "1")
-3. Create "1.1.1 - Stakeholder Interviews" (Level 3, under "1.1")
-4. Create "2 - Development" (Level 1)
-5. Create "2.1 - Frontend" (Level 2, under "2")
+1. Create "0.1 - Project Planning" (Level 1, under the "0" root)
+2. Create "0.1.1 - Requirements" (Level 2, under "0.1")
+3. Create "0.1.1.1 - Stakeholder Interviews" (Level 3, under "0.1.1")
+4. Create "0.2 - Development" (Level 1, under the "0" root)
+5. Create "0.2.1 - Frontend" (Level 2, under "0.2")
 
 ### ❌ Invalid Attempts (Will Be Blocked)
-1. ❌ Creating "1.1.1" without first creating "1.1"
+1. ❌ Creating "0.1.1" without first creating "0.1"
 2. ❌ Creating Level 3 items when no Level 2 items exist
 3. ❌ Assigning Level 4 to a child of Level 2 parent
-4. ❌ Creating root-level items with level other than 1
+4. ❌ Creating a second Level 0 root task
 
 ## Benefits
 

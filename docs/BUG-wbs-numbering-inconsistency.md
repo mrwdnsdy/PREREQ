@@ -1,9 +1,31 @@
 # Bug report: inconsistent WBS numbering between task-creation paths
 
-**Status:** open — documented, not yet fixed
+**Status:** RESOLVED — standardized on the 0-prefixed scheme (see "Resolution")
 **Severity:** medium (data-correctness / reporting integrity)
 **Found by:** end-to-end tests added in `backend/test/` (see "Evidence" below)
 **Affects:** `backend` — `tasks.service.ts` and `schedule-import.service.ts`
+
+## Resolution
+
+Standardized both paths on the **0-prefixed scheme** (`0.1`, `0.1.1`), matching
+the pre-existing interactive `POST /tasks` behaviour (the least disruptive option
+for existing UI-created data). Changes:
+
+- `schedule-import.service.ts` now generates codes with the `0` root prefix
+  (`generateWbsCodes(wbsTree, '0')`) and parents imported top-level tasks under
+  the Level 0 root instead of leaving them as siblings (`parentId: null`).
+- `WBS_HIERARCHY_RULES.md` updated to document the 0-prefixed scheme.
+- The schedule-import e2e assertions were updated to expect `0.1`/`0.1.1` and
+  root parenting; both creation paths now produce identical trees.
+
+**Remaining follow-up (not done here):** the import path still writes via
+`prisma.task.create` directly and does not run `validateWbsHierarchy`. Routing it
+through the shared validation is recommended but was deferred to avoid a larger
+refactor (it would require injecting `TasksService` into `ScheduleImportService`).
+
+---
+
+_Original report below._
 
 ## Summary
 

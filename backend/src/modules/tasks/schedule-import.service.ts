@@ -46,9 +46,11 @@ export class ScheduleImportService {
     // Build WBS hierarchy from flat structure
     const wbsTree = this.buildWbsHierarchy(importDto.tasks);
     
-    // Generate WBS codes if needed
+    // Generate WBS codes if needed. Codes are prefixed with the project root's
+    // "0" so imported tasks match the interactive create path (0.1, 0.1.1, …)
+    // rather than diverging to a separate 1/1.1 scheme.
     if (importDto.options?.generateWbsCodes) {
-      this.generateWbsCodes(wbsTree);
+      this.generateWbsCodes(wbsTree, '0');
     }
 
     // Create tasks in database
@@ -154,15 +156,24 @@ export class ScheduleImportService {
 
   private async createTasksFromTree(nodes: WbsNode[], projectId: string): Promise<any[]> {
     const createdTasks: any[] = [];
-    
+
     // Create project root if doesn't exist
     await this.ensureProjectRoot(projectId);
-    
+
+    // Parent the imported top-level tasks under the level-0 project root so the
+    // resulting tree matches the interactive create path (children of "0")
+    // instead of becoming siblings of the root.
+    const root = await this.prisma.task.findFirst({
+      where: { projectId, level: 0 },
+      select: { id: true },
+    });
+    const rootParentId = root?.id ?? null;
+
     for (const node of nodes) {
-      const tasks = await this.createNodeAndChildren(node, projectId, null);
+      const tasks = await this.createNodeAndChildren(node, projectId, rootParentId);
       createdTasks.push(...tasks);
     }
-    
+
     return createdTasks;
   }
 

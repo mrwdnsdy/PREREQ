@@ -83,9 +83,9 @@ describe('Projects & Tasks (e2e)', () => {
 
   // NOTE: the level-0 project root carries WBS code "0" and every task must be
   // created beneath it (a second level-0 task is rejected), so the generator
-  // produces "0.1", "0.2", "0.1.1" rather than the "1", "1.1" shown in
-  // WBS_HIERARCHY_RULES.md. These tests pin the service's *actual* behaviour;
-  // the doc/behaviour mismatch is tracked separately.
+  // produces "0.1", "0.2", "0.1.1". This 0-prefixed scheme is the canonical one:
+  // the schedule-import path was aligned to it, and WBS_HIERARCHY_RULES.md
+  // documents it.
   it('POST /tasks generates sequential WBS codes for the root\'s direct children', async () => {
     const phase1 = await request(app.getHttpServer())
       .post('/tasks')

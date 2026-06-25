@@ -103,18 +103,21 @@ describe('Schedule import (e2e)', () => {
       select: { id: true, wbsCode: true, activityId: true, level: true, parentId: true },
     });
     const byActivity = Object.fromEntries(tasks.map((t) => [t.activityId, t]));
+    const root = tasks.find((t) => t.level === 0);
 
-    // Imported activity ids are preserved and codes come from the in-memory tree.
-    expect(byActivity['A1']).toMatchObject({ wbsCode: '1', level: 1, parentId: null });
-    expect(byActivity['A2']).toMatchObject({ wbsCode: '1.1', level: 2 });
-    expect(byActivity['A3']).toMatchObject({ wbsCode: '1.2', level: 2 });
+    // Imported activity ids are preserved; codes are 0-prefixed (matching the
+    // interactive create path) and the top-level task is parented under root.
+    expect(byActivity['A1']).toMatchObject({ wbsCode: '0.1', level: 1 });
+    expect(byActivity['A1'].parentId).toBe(root!.id);
+    expect(byActivity['A2']).toMatchObject({ wbsCode: '0.1.1', level: 2 });
+    expect(byActivity['A3']).toMatchObject({ wbsCode: '0.1.2', level: 2 });
 
-    // The deeper tasks are nested under A1, not the project root.
+    // The deeper tasks are nested under A1.
     expect(byActivity['A2'].parentId).toBe(byActivity['A1'].id);
 
     // The pre-existing level-0 project root still exists alongside the import.
     const codes = tasks.map((t) => t.wbsCode);
-    expect(codes).toEqual(expect.arrayContaining(['0', '1', '1.1', '1.2']));
+    expect(codes).toEqual(expect.arrayContaining(['0', '0.1', '0.1.1', '0.1.2']));
   });
 
   it('replaceExisting wipes prior tasks and recreates the tree', async () => {
