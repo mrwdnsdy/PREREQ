@@ -15,14 +15,34 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Flag, FolderPlus, Trash2, X, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
+import {
+  Plus,
+  Flag,
+  FolderPlus,
+  Trash2,
+  X,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Activity,
+  CalendarClock,
+  CornerDownRight,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Task } from '../../hooks/useTasks'
 import { useDependencies } from '../../hooks/useDependencies'
 import { DependencyType, TaskDependency } from '../../services/dependenciesApi'
 import { buildFlow, SavedPositions, EDGE_COLORS } from './flowTransform'
+import { computeCpm, scheduleDates } from './cpm'
 import { nodeTypes } from './nodes'
 import { CanvasActionsContext } from './canvasContext'
+
+interface NodeMenu {
+  x: number
+  y: number
+  id: string
+  parentId: string | null
+  isMilestone: boolean
+}
 
 export interface ScheduleCanvasProps {
   tasks: Task[]
@@ -69,12 +89,22 @@ function CanvasInner({
   const [positions, setPositions] = useState<SavedPositions>(() => loadPositions(projectId))
   const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(projectId))
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null)
+  const [showCritical, setShowCritical] = useState(true)
+  const [menu, setMenu] = useState<NodeMenu | null>(null)
 
   const deps = useMemo(() => allDependencies || [], [allDependencies])
 
+  // Critical Path Method over the current activities + dependencies.
+  const cpm = useMemo(() => computeCpm(tasks, deps), [tasks, deps])
+
   const flow = useMemo(
-    () => buildFlow(tasks, deps, positions, selectedTaskId, collapsed),
-    [tasks, deps, positions, selectedTaskId, collapsed],
+    () =>
+      buildFlow(tasks, deps, positions, selectedTaskId, collapsed, {
+        cpm: cpm.nodes,
+        criticalEdges: cpm.criticalEdges,
+        showCritical,
+      }),
+    [tasks, deps, positions, selectedTaskId, collapsed, cpm, showCritical],
   )
 
   // Task ids that are WBS groups (have children) — for collapse/expand all.
@@ -141,6 +171,12 @@ function CanvasInner({
     queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
   }, [deps.length, projectId, queryClient])
 
+  // Auto-fit the view when groups collapse/expand (layout changes shape).
+  useEffect(() => {
+    const h = setTimeout(() => rf.fitView({ padding: 0.15, duration: 300 }), 90)
+    return () => clearTimeout(h)
+  }, [collapsed, rf])
+
   const persistPosition = useCallback(
     (id: string, x: number, y: number) => {
       setPositions((prev) => {
@@ -184,8 +220,34 @@ function CanvasInner({
 
   const onPaneClick = useCallback(() => {
     setSelectedEdge(null)
+    setMenu(null)
     onSelectTask(null)
   }, [onSelectTask])
+
+  const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
+    e.preventDefault()
+    const t = node.data?.task as Task | undefined
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      id: node.id,
+      parentId: (node.parentNode as string) || null,
+      isMilestone: !!t?.isMilestone,
+    })
+  }, [])
+
+  // Auto-schedule: roll early-start dates out of the dependency network.
+  const autoSchedule = useCallback(() => {
+    const updates = scheduleDates(tasks, cpm)
+    if (!updates.length) {
+      toast('Schedule already matches the dependencies.', { icon: '✅' })
+      return
+    }
+    if (!window.confirm(`Reschedule ${updates.length} activit${updates.length === 1 ? 'y' : 'ies'} from their dependencies?`))
+      return
+    updates.forEach((u) => onUpdateTask(u.id, { startDate: u.startDate, endDate: u.endDate }))
+    toast.success(`Rescheduled ${updates.length} activit${updates.length === 1 ? 'y' : 'ies'}`)
+  }, [tasks, cpm, onUpdateTask])
 
   // Persist a manual drag, and re-parent into a WBS group when dropped inside one.
   const onNodeDragStop = useCallback(
@@ -251,8 +313,10 @@ function CanvasInner({
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeClick={onNodeClick}
+      onNodeContextMenu={onNodeContextMenu}
       onEdgeClick={onEdgeClick}
       onPaneClick={onPaneClick}
+      onMoveStart={() => setMenu(null)}
       onNodeDragStop={onNodeDragStop}
       onNodesDelete={onNodesDelete}
       onEdgesDelete={onEdgesDelete}
@@ -313,6 +377,25 @@ function CanvasInner({
             </button>
           </>
         )}
+        <span className="mx-0.5 w-px self-stretch bg-gray-200" />
+        <button
+          onClick={() => setShowCritical((v) => !v)}
+          title="Highlight the critical path"
+          className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-sm font-medium shadow-sm transition-colors ${
+            showCritical
+              ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Activity className="h-4 w-4" /> Critical path
+        </button>
+        <button
+          onClick={autoSchedule}
+          title="Set dates from the dependency network (early start)"
+          className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+        >
+          <CalendarClock className="h-4 w-4" /> Auto-schedule
+        </button>
       </Panel>
 
       {/* Edge inspector */}
@@ -377,6 +460,56 @@ function CanvasInner({
         </Panel>
       )}
     </ReactFlow>
+
+      {menu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} />
+          <div
+            className="fixed z-50 w-52 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
+            style={{ left: menu.x, top: menu.y }}
+          >
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-100"
+              onClick={() => {
+                onAddTask({ title: 'New Activity', parentId: menu.parentId || undefined })
+                setMenu(null)
+              }}
+            >
+              <Plus className="h-4 w-4 text-gray-500" /> Add activity here
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-100"
+              onClick={() => {
+                onAddTask({ title: 'New Activity', parentId: menu.id })
+                setMenu(null)
+              }}
+            >
+              <CornerDownRight className="h-4 w-4 text-gray-500" /> Add child activity
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-100"
+              onClick={() => {
+                onUpdateTask(menu.id, { isMilestone: !menu.isMilestone })
+                setMenu(null)
+              }}
+            >
+              <Flag className="h-4 w-4 text-gray-500" />
+              {menu.isMilestone ? 'Convert to activity' : 'Convert to milestone'}
+            </button>
+            <div className="my-1 border-t border-gray-100" />
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-600 hover:bg-red-50"
+              onClick={() => {
+                onDeleteTask(menu.id)
+                if (selectedTaskId === menu.id) onSelectTask(null)
+                setMenu(null)
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </button>
+          </div>
+        </>
+      )}
     </CanvasActionsContext.Provider>
   )
 }

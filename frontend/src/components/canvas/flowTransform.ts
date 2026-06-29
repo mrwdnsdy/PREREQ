@@ -3,6 +3,15 @@ import { MarkerType } from 'reactflow'
 import type { Node, Edge } from 'reactflow'
 import { Task } from '../../hooks/useTasks'
 import { TaskDependency } from '../../services/dependenciesApi'
+import type { CpmNode } from './cpm'
+
+export interface BuildOptions {
+  cpm?: Map<string, CpmNode>
+  criticalEdges?: Set<string>
+  showCritical?: boolean
+}
+
+const CRITICAL_COLOR = '#dc2626'
 
 // Node/layout geometry
 export const LEAF_W = 200
@@ -134,37 +143,51 @@ function measure(
     }
   }
 
-  const leafKids = kids.filter((k) => (children.get(k.id)?.length ?? 0) === 0)
-  const groupKids = kids.filter((k) => (children.get(k.id)?.length ?? 0) > 0)
+  // Walk children in WBS order, interleaving leaf "bands" (consecutive leaf
+  // siblings laid out left-to-right by dependency) with sub-group rows.
+  const childBoxes: Box[] = []
+  let cursorY = HEADER_H + PAD
+  let maxChildW = 0
+  let band: Task[] = []
 
-  // Leaf band (dependency-ordered) at the top of the group.
-  const leafLayout = layoutLeaves(leafKids, depPairs)
-  const leafBoxes: Box[] = leafKids.map((l) => ({
-    task: l,
-    kind: l.isMilestone ? 'milestone' : ('activity' as const),
-    x: PAD + leafLayout.positions[l.id].x,
-    y: HEADER_H + PAD + leafLayout.positions[l.id].y,
-    w: LEAF_W,
-    h: LEAF_H,
-    children: [],
-  }))
-
-  // Sub-groups stacked below the leaf band (WBS order from childMap).
-  let cursorY = HEADER_H + PAD + (leafKids.length ? leafLayout.h + GAP : 0)
-  let maxChildW = leafLayout.w
-  const groupBoxes: Box[] = []
-  for (const sub of groupKids) {
-    const box = measure(sub, children, depPairs, collapsed)
-    box.x = PAD
-    box.y = cursorY
-    groupBoxes.push(box)
-    cursorY += box.h + GAP
-    maxChildW = Math.max(maxChildW, box.w)
+  const flushBand = () => {
+    if (!band.length) return
+    const layout = layoutLeaves(band, depPairs)
+    for (const l of band) {
+      childBoxes.push({
+        task: l,
+        kind: l.isMilestone ? 'milestone' : 'activity',
+        x: PAD + layout.positions[l.id].x,
+        y: cursorY + layout.positions[l.id].y,
+        w: LEAF_W,
+        h: LEAF_H,
+        children: [],
+      })
+    }
+    maxChildW = Math.max(maxChildW, layout.w)
+    cursorY += layout.h + GAP
+    band = []
   }
 
-  const innerBottom = groupKids.length ? cursorY - GAP : HEADER_H + PAD + leafLayout.h
+  for (const k of kids) {
+    const kIsGroup = (children.get(k.id)?.length ?? 0) > 0
+    if (kIsGroup) {
+      flushBand()
+      const box = measure(k, children, depPairs, collapsed)
+      box.x = PAD
+      box.y = cursorY
+      childBoxes.push(box)
+      maxChildW = Math.max(maxChildW, box.w)
+      cursorY += box.h + GAP
+    } else {
+      band.push(k)
+    }
+  }
+  flushBand()
+
+  const innerBottom = cursorY - GAP
   const w = Math.max(LEAF_W, maxChildW) + PAD * 2
-  const h = innerBottom + PAD
+  const h = Math.max(HEADER_H + PAD * 2, innerBottom + PAD)
   return {
     task,
     kind: 'group',
@@ -174,7 +197,7 @@ function measure(
     y: 0,
     w,
     h,
-    children: [...leafBoxes, ...groupBoxes],
+    children: childBoxes,
   }
 }
 
@@ -185,8 +208,10 @@ function emit(
   saved: SavedPositions,
   selectedId: string | null,
   out: Node[],
+  opts: BuildOptions,
 ): void {
   const pos = saved[box.task.id] ?? { x: box.x, y: box.y }
+  const cpm = opts.cpm?.get(box.task.id)
   const base: Node = {
     id: box.task.id,
     type: box.kind === 'group' ? 'wbsGroup' : box.kind,
@@ -196,6 +221,8 @@ function emit(
       label: `${box.task.wbsCode || ''} ${box.task.name}`.trim(),
       collapsed: box.collapsed,
       childCount: box.childCount,
+      cpm,
+      showCritical: opts.showCritical,
     },
     selected: box.task.id === selectedId,
     draggable: true,
@@ -209,7 +236,7 @@ function emit(
     base.zIndex = 0
   }
   out.push(base)
-  for (const child of box.children) emit(child, box.task.id, saved, selectedId, out)
+  for (const child of box.children) emit(child, box.task.id, saved, selectedId, out, opts)
 }
 
 // Map a task to the shallowest collapsed ancestor that hides it (or itself if visible).
@@ -243,6 +270,7 @@ export function buildFlow(
   saved: SavedPositions = {},
   selectedId: string | null = null,
   collapsed: Set<string> = new Set(),
+  opts: BuildOptions = {},
 ): FlowResult {
   const children = childMap(tasks)
   const byId = new Map(tasks.map((t) => [t.id, t]))
@@ -256,7 +284,7 @@ export function buildFlow(
     const box = measure(root, children, depPairs, collapsed)
     box.x = 0
     box.y = cursorY
-    emit(box, null, saved, selectedId, nodes)
+    emit(box, null, saved, selectedId, nodes, opts)
     cursorY += box.h + ROOT_GAP
   }
 
@@ -274,7 +302,8 @@ export function buildFlow(
     if (seen.has(key)) continue
     seen.add(key)
     const bubbled = source !== d.predecessorId || target !== d.successorId
-    const color = EDGE_COLORS[d.type] || '#64748b'
+    const isCritical = !!opts.showCritical && !!opts.criticalEdges?.has(d.id)
+    const color = isCritical ? CRITICAL_COLOR : EDGE_COLORS[d.type] || '#64748b'
     edges.push({
       id: d.id,
       source,
@@ -282,9 +311,10 @@ export function buildFlow(
       label: bubbled ? undefined : depLabel(d.type, d.lag),
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
+      zIndex: isCritical ? 5 : undefined,
       style: {
         stroke: color,
-        strokeWidth: 1.8,
+        strokeWidth: isCritical ? 2.6 : 1.8,
         ...(bubbled ? { strokeDasharray: '5 4' } : {}),
       },
       labelStyle: { fill: color, fontSize: 11, fontWeight: 600 },
