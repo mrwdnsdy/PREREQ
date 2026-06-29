@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm install*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run build*)",
+      "Bash(npm test*)",
+      "Bash(npm run test*)",
+      "Bash(npx eslint*)",
+      "Bash(npx prisma generate)",
+      "Bash(npm run prisma:generate)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git fetch*)",
+      "Edit(.claude/ci-triage-state.md)",
+      "mcp__github__actions_list",
+      "mcp__github__actions_get",
+      "mcp__github__get_job_logs",
+      "mcp__github__get_check_run",
+      "mcp__github__pull_request_read",
+      "mcp__github__list_pull_requests",
+      "mcp__github__get_file_contents",
+      "mcp__github__list_commits",
+      "mcp__github__get_commit",
+      "mcp__github__search_code"
+    ],
+    "ask": [
+      "Edit(backend/prisma/schema.prisma)",
+      "Edit(backend/src/modules/auth/**)",
+      "Edit(infrastructure/**)",
+      "Edit(.github/workflows/**)",
+      "Edit(.claude/skills/**)",
+      "Edit(.claude/agents/**)",
+      "Edit(.claude/permissions.md)",
+      "Edit(.claude/settings.json)",
+      "Edit(.claude/LOOP.md)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push* origin main*)",
+      "mcp__github__merge_pull_request",
+      "mcp__github__enable_pr_auto_merge"
+    ]
+  }
+}
