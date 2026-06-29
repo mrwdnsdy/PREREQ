@@ -157,6 +157,21 @@ export const taskResources = {
   ],
 }
 
+// GET /dependencies?projectId= → TaskDependency[] (drives the canvas edges).
+const dep = (id: string, p: any, s: any, type: string, lag: number) => ({
+  id, predecessorId: p.id, successorId: s.id, type, lag,
+  createdAt: '2025-06-01T00:00:00Z', updatedAt: '2025-06-01T00:00:00Z',
+  predecessor: { id: p.id, title: p.title, wbsCode: p.wbsCode },
+  successor: { id: s.id, title: s.title, wbsCode: s.wbsCode },
+})
+export const dependencies = [
+  dep('d1', tasks[2], tasks[3], 'FS', 0), // Stakeholder Interviews → Design Phase
+  dep('d2', tasks[3], tasks[5], 'FS', 2), // Design Phase → Frontend Development (+2)
+  dep('d3', tasks[3], tasks[6], 'FS', 0), // Design Phase → Backend Development
+  dep('d4', tasks[5], tasks[7], 'FS', 0), // Frontend Development → Go-Live
+  dep('d5', tasks[6], tasks[7], 'SS', 1), // Backend Development → Go-Live (SS+1)
+]
+
 export const taskDependencies = {
   asPredecessor: [],
   asSuccessor: [

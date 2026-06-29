@@ -42,6 +42,8 @@ const VIEWS: ViewSpec[] = [
   { id: 'project-detail-empty', title: 'Project detail (no tasks)', path: `/projects/${PROJECT_ID}`, opts: { tasks: 'empty' }, expectText: 'No tasks', allowError: true },
   { id: 'project-detail-error', title: 'Project detail (API error)', path: `/projects/${PROJECT_ID}`, opts: { projects: 'error' }, allowError: true },
   { id: 'schedule', title: 'Schedule page', path: `/schedule/${PROJECT_ID}` },
+  { id: 'schedule-canvas', title: 'Schedule canvas (PDM)', path: `/schedule/${PROJECT_ID}?view=canvas`, expectText: 'Design Phase' },
+  { id: 'schedule-canvas-empty', title: 'Schedule canvas (empty)', path: `/schedule/${PROJECT_ID}?view=canvas`, opts: { tasks: 'empty' }, expectText: 'Add a Phase', allowError: true },
   { id: 'portfolio', title: 'Portfolio', path: '/portfolio', expectText: 'Enterprise Software Implementation' },
   { id: 'portfolio-empty', title: 'Portfolio (empty)', path: '/portfolio', opts: { projects: 'empty' }, allowError: true },
   { id: 'new-project', title: 'New Project form', path: '/projects/new' },

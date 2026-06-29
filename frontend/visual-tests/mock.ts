@@ -25,7 +25,7 @@ function resolveBody(path: string): unknown | undefined {
   if (path === '/resources') return fx.resources
   if (/^\/tasks\/[^/]+\/resources\/available$/.test(path)) return fx.resources
   if (/^\/tasks\/[^/]+\/resources$/.test(path)) return fx.taskResources
-  if (path === '/dependencies') return []
+  if (path === '/dependencies') return fx.dependencies
   if (/^\/dependencies\/task\/[^/]+$/.test(path)) return fx.taskDependencies
   // POST login endpoints (used only if the bypass is skipped)
   if (path === '/auth/dev-login' || path === '/auth/login') return { accessToken: 'test-token' }
