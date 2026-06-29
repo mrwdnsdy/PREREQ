@@ -25,6 +25,12 @@ concurrency:
 permissions:
   contents: read
 
+# @playwright/test is a frontend devDependency (visual-test harness). Skip its
+# browser download during `npm ci` — CI only builds/tests, it doesn't run the
+# harness (which uses the pre-installed browser in the dev environment).
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
 jobs:
   backend:
     name: backend (build · test)
