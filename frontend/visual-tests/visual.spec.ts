@@ -44,6 +44,20 @@ const VIEWS: ViewSpec[] = [
   { id: 'schedule', title: 'Schedule page', path: `/schedule/${PROJECT_ID}` },
   { id: 'schedule-canvas', title: 'Schedule canvas (PDM)', path: `/schedule/${PROJECT_ID}?view=canvas`, expectText: 'Design Phase' },
   { id: 'schedule-canvas-empty', title: 'Schedule canvas (empty)', path: `/schedule/${PROJECT_ID}?view=canvas`, opts: { tasks: 'empty' }, expectText: 'Add a Phase', allowError: true },
+  {
+    id: 'schedule-canvas-collapsed', title: 'Schedule canvas (collapsed group)',
+    path: `/schedule/${PROJECT_ID}?view=canvas`, expectText: 'Design Phase',
+    action: async (page) => {
+      // Collapse the "Development" group (t5) and re-render to capture it.
+      await page.evaluate(
+        (pid) => localStorage.setItem(`prereq:canvas-collapsed:${pid}`, JSON.stringify(['t5'])),
+        PROJECT_ID,
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.waitForLoadState('networkidle').catch(() => {})
+      await page.waitForTimeout(500)
+    },
+  },
   { id: 'portfolio', title: 'Portfolio', path: '/portfolio', expectText: 'Enterprise Software Implementation' },
   { id: 'portfolio-empty', title: 'Portfolio (empty)', path: '/portfolio', opts: { projects: 'empty' }, allowError: true },
   { id: 'new-project', title: 'New Project form', path: '/projects/new' },

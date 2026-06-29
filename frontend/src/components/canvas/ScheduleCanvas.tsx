@@ -15,13 +15,14 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Flag, FolderPlus, Trash2, X } from 'lucide-react'
+import { Plus, Flag, FolderPlus, Trash2, X, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Task } from '../../hooks/useTasks'
 import { useDependencies } from '../../hooks/useDependencies'
 import { DependencyType, TaskDependency } from '../../services/dependenciesApi'
 import { buildFlow, SavedPositions, EDGE_COLORS } from './flowTransform'
 import { nodeTypes } from './nodes'
+import { CanvasActionsContext } from './canvasContext'
 
 export interface ScheduleCanvasProps {
   tasks: Task[]
@@ -34,12 +35,21 @@ export interface ScheduleCanvasProps {
 }
 
 const posKey = (projectId: string) => `prereq:canvas-pos:${projectId}`
+const collapseKey = (projectId: string) => `prereq:canvas-collapsed:${projectId}`
 
 function loadPositions(projectId: string): SavedPositions {
   try {
     return JSON.parse(localStorage.getItem(posKey(projectId)) || '{}')
   } catch {
     return {}
+  }
+}
+
+function loadCollapsed(projectId: string): Set<string> {
+  try {
+    return new Set<string>(JSON.parse(localStorage.getItem(collapseKey(projectId)) || '[]'))
+  } catch {
+    return new Set()
   }
 }
 
@@ -57,13 +67,62 @@ function CanvasInner({
   const { allDependencies, createDependency, updateDependency, deleteDependency } =
     useDependencies(projectId)
   const [positions, setPositions] = useState<SavedPositions>(() => loadPositions(projectId))
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(projectId))
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null)
 
   const deps = useMemo(() => allDependencies || [], [allDependencies])
 
   const flow = useMemo(
-    () => buildFlow(tasks, deps, positions, selectedTaskId),
-    [tasks, deps, positions, selectedTaskId],
+    () => buildFlow(tasks, deps, positions, selectedTaskId, collapsed),
+    [tasks, deps, positions, selectedTaskId, collapsed],
+  )
+
+  // Task ids that are WBS groups (have children) — for collapse/expand all.
+  const groupIds = useMemo(() => {
+    const parents = new Set<string>()
+    tasks.forEach((t) => t.parentId && parents.add(t.parentId))
+    return [...parents]
+  }, [tasks])
+
+  const persistCollapsed = useCallback(
+    (next: Set<string>) => {
+      try {
+        localStorage.setItem(collapseKey(projectId), JSON.stringify([...next]))
+      } catch {
+        /* ignore quota errors */
+      }
+    },
+    [projectId],
+  )
+
+  const toggleCollapse = useCallback(
+    (id: string) => {
+      setCollapsed((prev) => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        persistCollapsed(next)
+        return next
+      })
+    },
+    [persistCollapsed],
+  )
+
+  const collapseAll = useCallback(() => {
+    const next = new Set(groupIds)
+    setCollapsed(next)
+    persistCollapsed(next)
+  }, [groupIds, persistCollapsed])
+
+  const expandAll = useCallback(() => {
+    const next = new Set<string>()
+    setCollapsed(next)
+    persistCollapsed(next)
+  }, [persistCollapsed])
+
+  const rename = useCallback(
+    (id: string, name: string) => onUpdateTask(id, { name }),
+    [onUpdateTask],
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flow.nodes)
@@ -184,6 +243,7 @@ function CanvasInner({
   const dep = selectedEdge?.data?.dependency as TaskDependency | undefined
 
   return (
+    <CanvasActionsContext.Provider value={{ collapsed, toggleCollapse, rename }}>
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -234,6 +294,25 @@ function CanvasInner({
         >
           <Flag className="h-4 w-4" /> Milestone
         </button>
+        {groupIds.length > 0 && (
+          <>
+            <span className="mx-0.5 w-px self-stretch bg-gray-200" />
+            <button
+              onClick={collapseAll}
+              title="Collapse all WBS groups"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              <ChevronsDownUp className="h-4 w-4" /> Collapse
+            </button>
+            <button
+              onClick={expandAll}
+              title="Expand all WBS groups"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              <ChevronsUpDown className="h-4 w-4" /> Expand
+            </button>
+          </>
+        )}
       </Panel>
 
       {/* Edge inspector */}
@@ -298,6 +377,7 @@ function CanvasInner({
         </Panel>
       )}
     </ReactFlow>
+    </CanvasActionsContext.Provider>
   )
 }
 
