@@ -331,6 +331,7 @@ function CanvasInner({
       <Background gap={20} color="#e5e7eb" />
       <Controls />
       <MiniMap
+        className="hidden sm:block"
         zoomable
         pannable
         nodeColor={(n) =>
@@ -338,25 +339,25 @@ function CanvasInner({
         }
       />
 
-      {/* Toolbar */}
-      <Panel position="top-left" className="flex gap-2">
+      {/* Toolbar — wraps and condenses to icons on small screens */}
+      <Panel position="top-left" className="flex flex-wrap gap-1.5 max-w-[calc(100vw-5rem)]">
         <button
           onClick={addPhase}
           className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
         >
-          <FolderPlus className="h-4 w-4" /> Phase
+          <FolderPlus className="h-4 w-4" /> <span className="hidden sm:inline">Phase</span>
         </button>
         <button
           onClick={addActivity}
           className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
         >
-          <Plus className="h-4 w-4" /> Activity
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Activity</span>
         </button>
         <button
           onClick={addMilestone}
           className="inline-flex items-center gap-1 rounded-md border border-amber-400 bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-700 shadow-sm hover:bg-amber-100"
         >
-          <Flag className="h-4 w-4" /> Milestone
+          <Flag className="h-4 w-4" /> <span className="hidden sm:inline">Milestone</span>
         </button>
         {groupIds.length > 0 && (
           <>
@@ -366,14 +367,14 @@ function CanvasInner({
               title="Collapse all WBS groups"
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             >
-              <ChevronsDownUp className="h-4 w-4" /> Collapse
+              <ChevronsDownUp className="h-4 w-4" /> <span className="hidden sm:inline">Collapse</span>
             </button>
             <button
               onClick={expandAll}
               title="Expand all WBS groups"
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             >
-              <ChevronsUpDown className="h-4 w-4" /> Expand
+              <ChevronsUpDown className="h-4 w-4" /> <span className="hidden sm:inline">Expand</span>
             </button>
           </>
         )}
@@ -387,14 +388,14 @@ function CanvasInner({
               : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
           }`}
         >
-          <Activity className="h-4 w-4" /> Critical path
+          <Activity className="h-4 w-4" /> <span className="hidden sm:inline">Critical path</span>
         </button>
         <button
           onClick={autoSchedule}
           title="Set dates from the dependency network (early start)"
           className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
         >
-          <CalendarClock className="h-4 w-4" /> Auto-schedule
+          <CalendarClock className="h-4 w-4" /> <span className="hidden sm:inline">Auto-schedule</span>
         </button>
       </Panel>
 

@@ -223,11 +223,9 @@ const SchedulePage: React.FC = () => {
             className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-sky-500"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Project
+            <span className="hidden sm:inline">Back to Project</span>
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">
-            Project Schedule
-          </h1>
+          <h1 className="text-lg font-semibold text-gray-900 hidden md:block">Project Schedule</h1>
         </div>
         
         <div className="flex items-center gap-3">
@@ -239,7 +237,7 @@ const SchedulePage: React.FC = () => {
                 view === 'table' ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              <Table2 className="w-4 h-4" /> Table
+              <Table2 className="w-4 h-4" /> <span className="hidden sm:inline">Table</span>
             </button>
             <button
               onClick={() => setView('canvas')}
@@ -247,7 +245,7 @@ const SchedulePage: React.FC = () => {
                 view === 'canvas' ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              <Network className="w-4 h-4" /> Canvas
+              <Network className="w-4 h-4" /> <span className="hidden sm:inline">Canvas</span>
             </button>
           </div>
 
@@ -275,7 +273,7 @@ const SchedulePage: React.FC = () => {
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-sky-500"
             >
               <Settings className="w-4 h-4" />
-              Columns
+              <span className="hidden sm:inline">Columns</span>
             </button>
             
             {showColumnMenu && (
