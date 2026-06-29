@@ -228,8 +228,31 @@ This creates:
 - **S3 + CloudFront**: Frontend hosting
 - **Cognito User Pool**: Authentication service
 
+### Frontend on GitHub Pages
+The frontend can be published as a static site to GitHub Pages via
+`.github/workflows/deploy-pages.yml`, which runs on every push to `main`
+(or manually via *Actions → Deploy frontend to GitHub Pages → Run workflow*).
+The site is served at `https://<owner>.github.io/PREREQ/`.
+
+Pages is static-only — it cannot host the NestJS backend or database — so the
+deployed SPA needs to talk to a separately-hosted API:
+
+1. Stand up the backend somewhere public (AWS, Render, Fly, …).
+2. In the repo, set **Settings → Secrets and variables → Actions → Variables →
+   `VITE_API_URL`** to that backend's base URL (e.g. `https://api.prereq.app`).
+   The value is baked into the build. If unset, it falls back to
+   `http://localhost:3000` (so the page loads but API calls only work locally).
+3. Configure the backend's **CORS** to allow the Pages origin
+   (`https://<owner>.github.io`).
+
+The workflow self-enables Pages (`actions/configure-pages` with
+`enablement: true`), sets the project base path (`VITE_BASE=/PREREQ/`), and writes
+a `404.html` SPA fallback so client-side routes resolve. Local dev and the AWS
+build are unaffected (base defaults to `/`, API to localhost).
+
 ### Environment Configuration
-- **Local**: `.env.dev` files
+- **Local**: `.env.dev` files (frontend reads `VITE_API_URL`, default `http://localhost:3000`)
+- **GitHub Pages**: Actions variable `VITE_API_URL`
 - **AWS**: Environment variables + Secrets Manager
 
 ## 📊 Database Schema
