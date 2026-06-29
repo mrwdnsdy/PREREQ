@@ -51,8 +51,8 @@ coverage/
 *.tmp
 *.temp
 
-# Package lock files (keep only one type)
-package-lock.json
+# Lockfiles: commit the npm lockfile so installs (and CI) are deterministic.
+# Keep yarn.lock ignored — this repo uses npm.
 yarn.lock
 
 # AWS credentials (never commit these)

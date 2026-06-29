@@ -1293,7 +1293,7 @@ export const ResourceDrawer: React.FC<ResourceDrawerProps> = ({
                             <div>
                               <h5 className="font-medium text-gray-900 mb-3">Cost by Resource Type</h5>
                               <div className="space-y-2">
-                                {Object.entries(budgetSummary.byType).map(([type, data]) => (
+                                {Object.entries(budgetSummary.byType).map(([type, data]: [string, { cost: number; hours: number; count: number }]) => (
                                   <div key={type} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                                     <div>
                                       <span className="font-medium text-gray-900">{type}</span>
