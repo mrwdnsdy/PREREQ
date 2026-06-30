@@ -56,10 +56,12 @@ const Dashboard = () => {
       color: 'text-primary-600'
     },
     {
-      title: 'Timeline',
-      description: 'View project timeline',
+      title: 'Schedule',
+      description: 'Open the canvas schedule',
       icon: Calendar,
-      href: '/timeline',
+      // Deep-link into the most recent project's canvas; fall back to the
+      // projects list when none have loaded yet.
+      href: projects[0] ? `/schedule/${projects[0].id}?view=canvas` : '/projects',
       color: 'text-primary-600'
     }
   ]

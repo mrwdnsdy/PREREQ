@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, AlertCircle, ClipboardIcon, Upload, Trash2, ChevronLeft } from 'lucide-react'
+import { Plus, AlertCircle, ClipboardIcon, Upload, Trash2, ChevronLeft, Network } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { TaskTable } from '../components/TaskTable'
 import { ResourceDrawer } from '../components/drawers/ResourceDrawer'
@@ -287,8 +287,17 @@ const ProjectDetail: React.FC = () => {
               </button>
             )}
 
+            {/* Schedule / Canvas view */}
+            <button
+              onClick={() => navigate(`/schedule/${projectId}?view=canvas`)}
+              className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-sm font-medium text-sky-700 hover:bg-sky-100 focus:ring-2 focus:ring-sky-500"
+            >
+              <Network className="w-4 h-4" />
+              Schedule
+            </button>
+
             {/* Import Schedule Button */}
-            <button 
+            <button
               onClick={() => navigate(`/projects/${projectId}/import-schedule`)}
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-sky-500"
             >
