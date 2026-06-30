@@ -64,6 +64,9 @@ function AppRoutes() {
         <Route path="portfolio" element={<PortfolioView />} />
         <Route path="schedule/:projectId" element={<SchedulePage />} />
       </Route>
+      {/* Catch-all: unknown paths (stale links, typos, removed routes like
+          /timeline) redirect home instead of rendering a blank page. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
