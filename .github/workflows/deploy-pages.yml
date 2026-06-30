@@ -45,6 +45,10 @@ jobs:
           # Project Pages serves at /<repo>/ — must match the repository name.
           VITE_BASE: /PREREQ/
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          # Demo mode: with no VITE_API_URL set, serve an in-browser mock backend
+          # so the public site is fully clickable (login bypassed, sample data).
+          # Setting VITE_API_URL later automatically disables the demo.
+          VITE_DEMO: '1'
         run: npm run build
       - name: SPA fallback (client-side routing on Pages)
         run: cp frontend/dist/index.html frontend/dist/404.html

@@ -13,6 +13,7 @@ import NewProject from './pages/NewProject'
 import NewTask from './pages/NewTask'
 import SchedulePage from './pages/SchedulePage'
 import ImportSchedule from './pages/ImportSchedule'
+import DemoBanner from './components/DemoBanner'
 
 const queryClient = new QueryClient()
 
@@ -72,7 +73,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AppRoutes />
-        <Toaster 
+        <DemoBanner />
+        <Toaster
           position="top-right"
           toastOptions={{
             duration: 5000,

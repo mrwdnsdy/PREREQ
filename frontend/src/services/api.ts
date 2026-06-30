@@ -1,4 +1,11 @@
 import axios from 'axios'
+import { demoAdapter } from '../demo/demoAdapter'
+
+// Demo mode: when the build is flagged for the public Pages demo AND no real
+// backend URL is configured, serve every request from an in-browser mock store
+// so the site is fully clickable with no server. A configured VITE_API_URL
+// always wins (real backend), and local dev is unaffected.
+const DEMO = import.meta.env.VITE_DEMO === '1' && !import.meta.env.VITE_API_URL
 
 const api = axios.create({
   // Configurable so a hosted build (e.g. GitHub Pages) can point at a real
@@ -10,6 +17,15 @@ const api = axios.create({
   },
   withCredentials: true,
 })
+
+if (DEMO) {
+  // Route all HTTP through the in-browser demo backend, synchronously, so the
+  // adapter is in place before AuthProvider's mount effect fires its first
+  // request. Seed a token first so the app hydrates the demo user and skips
+  // the login page.
+  try { localStorage.setItem('authToken', 'demo') } catch { /* SSR/no storage */ }
+  api.defaults.adapter = demoAdapter
+}
 
 // Add request interceptor for better error handling
 api.interceptors.request.use(
