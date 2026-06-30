@@ -3,6 +3,13 @@ import { Task } from '../hooks/useTasks'
 import { TaskRelation } from '../services/scheduleApi'
 import { DatePickerCell } from './DatePickerCell'
 import { ChevronRight, Plus, Trash2, Edit2, Copy, Scissors, ArrowRight, Eye, EyeOff } from 'lucide-react'
+import {
+  getWbsLevel,
+  getRowBackgroundColor,
+  getWbsTextColor,
+  getTaskNameTextColor,
+  getBorderColor,
+} from '../utils/wbsColors'
 
 interface TaskTableProps {
   tasks: Task[]
@@ -413,16 +420,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   // Depth calculation for visual nesting
   const depth = (code: string): number => code.split('.').length - 1
 
-  // Enhanced WBS helper functions
-  const getWbsLevel = (wbsPath: string): number => {
-    if (!wbsPath) return 1
-    // For level 0 (root project), wbsPath is "0"
-    if (wbsPath === '0') return 0
-    // Count meaningful levels, excluding trailing zeros
-    const parts = wbsPath.split('.').filter(part => part !== '0' && part !== '')
-    return Math.max(1, parts.length)
-  }
-
+  // WBS level → color helpers live in ../utils/wbsColors (shared with the canvas).
   const formatWbsCode = (wbsPath: string): string => {
     if (!wbsPath) return '1.0'
     // For level 0 root project, just return "0"
@@ -435,78 +433,6 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   const getIndentationLevel = (wbsPath: string): number => {
     return Math.max(0, getWbsLevel(wbsPath))
-  }
-
-  const getRowBackgroundColor = (wbsPath: string): string => {
-    const level = getWbsLevel(wbsPath)
-    const colors = [
-      'bg-slate-50',        // Level 0: Light slate - Project root
-      'bg-blue-50',         // Level 1: Light blue - Project phases
-      'bg-green-50',        // Level 2: Light green - Major work packages
-      'bg-purple-50',       // Level 3: Light purple - Work packages
-      'bg-orange-50',       // Level 4: Light orange - Activities
-      'bg-pink-50',         // Level 5: Light pink - Sub-activities
-      'bg-indigo-50',       // Level 6: Light indigo - Tasks
-      'bg-teal-50',         // Level 7: Light teal - Sub-tasks
-      'bg-red-50',          // Level 8: Light red - Details
-      'bg-amber-50',        // Level 9: Light amber - Sub-details
-      'bg-gray-50'          // Level 10: Light gray - Maximum depth
-    ]
-    return colors[Math.min(level, colors.length - 1)] || 'bg-white'
-  }
-
-  const getWbsTextColor = (wbsPath: string): string => {
-    const level = getWbsLevel(wbsPath)
-    const colors = [
-      'text-slate-900 font-black',      // Level 0: Very dark slate, black weight - Project root
-      'text-blue-800 font-bold',        // Level 1: Dark blue, bold
-      'text-green-800 font-bold',       // Level 2: Dark green, bold
-      'text-purple-800 font-semibold',  // Level 3: Dark purple, semibold
-      'text-orange-800 font-semibold',  // Level 4: Dark orange, semibold
-      'text-pink-800 font-medium',      // Level 5: Dark pink, medium
-      'text-indigo-800 font-medium',    // Level 6: Dark indigo, medium
-      'text-teal-800',                  // Level 7: Dark teal, normal
-      'text-red-800',                   // Level 8: Dark red, normal
-      'text-amber-800',                 // Level 9: Dark amber, normal
-      'text-gray-800'                   // Level 10: Dark gray, normal
-    ]
-    return colors[Math.min(level, colors.length - 1)] || 'text-gray-600'
-  }
-
-  const getTaskNameTextColor = (wbsPath: string): string => {
-    const level = getWbsLevel(wbsPath)
-    const colors = [
-      'text-slate-900 font-black',      // Level 0: Very dark slate, black weight - Project root
-      'text-blue-900 font-bold',        // Level 1: Very dark blue, bold
-      'text-green-900 font-bold',       // Level 2: Very dark green, bold
-      'text-purple-800 font-semibold',  // Level 3: Dark purple, semibold
-      'text-orange-800 font-semibold',  // Level 4: Dark orange, semibold
-      'text-pink-800 font-medium',      // Level 5: Dark pink, medium
-      'text-indigo-800 font-medium',    // Level 6: Dark indigo, medium
-      'text-teal-700',                  // Level 7: Dark teal, normal
-      'text-red-700',                   // Level 8: Dark red, normal
-      'text-amber-700',                 // Level 9: Dark amber, normal
-      'text-gray-700'                   // Level 10: Dark gray, normal
-    ]
-    return colors[Math.min(level, colors.length - 1)] || 'text-gray-700'
-  }
-
-  const getBorderColor = (wbsPath: string): string => {
-    const level = getWbsLevel(wbsPath)
-    const colors = [
-      'border-slate-300',    // Level 0
-      'border-blue-200',     // Level 1
-      'border-green-200',    // Level 2
-      'border-purple-200',   // Level 3
-      'border-orange-200',   // Level 4
-      'border-pink-200',     // Level 5
-      'border-indigo-200',   // Level 6
-      'border-teal-200',     // Level 7
-      'border-red-200',      // Level 8
-      'border-amber-200',    // Level 9
-      'border-gray-200'      // Level 10
-    ]
-    return colors[Math.min(level, colors.length - 1)] || 'border-gray-200'
   }
 
   // Calculate budget rollup for a task (includes children)

@@ -9,6 +9,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   ConnectionLineType,
+  ConnectionMode,
   type Connection,
   type Edge,
   type Node,
@@ -321,6 +322,7 @@ function CanvasInner({
       onNodesDelete={onNodesDelete}
       onEdgesDelete={onEdgesDelete}
       nodeTypes={nodeTypes}
+      connectionMode={ConnectionMode.Loose}
       connectionLineType={ConnectionLineType.SmoothStep}
       defaultEdgeOptions={{ type: 'smoothstep' }}
       minZoom={0.15}

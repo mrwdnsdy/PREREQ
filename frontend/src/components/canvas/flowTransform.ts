@@ -308,6 +308,10 @@ export function buildFlow(
       id: d.id,
       source,
       target,
+      // Anchor to the right→left side strips so existing links keep their clean
+      // left-to-right routing now that nodes expose handles on all four sides.
+      sourceHandle: 'right',
+      targetHandle: 'left',
       label: bubbled ? undefined : depLabel(d.type, d.lag),
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },

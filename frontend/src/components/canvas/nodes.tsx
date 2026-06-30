@@ -4,6 +4,7 @@ import { Flag, Calendar, ChevronDown, ChevronRight } from 'lucide-react'
 import { Task } from '../../hooks/useTasks'
 import { formatDate } from '../../utils/dateFormat'
 import { useCanvasActions } from './canvasContext'
+import { wbsGroupTheme } from '../../utils/wbsColors'
 import type { CpmNode } from './cpm'
 
 interface NodeData {
@@ -32,7 +33,25 @@ function CpmChip({ data }: { data: NodeData }) {
   )
 }
 
-const handleStyle = { width: 9, height: 9, background: '#0284c7', border: '2px solid #fff' }
+// Connect points: a thin sky strip down/across each of the four sides, so a
+// link can be started or finished anywhere around a box's edges (not just two
+// fixed points). Faint until the node is hovered. All four are `type="source"`;
+// ConnectionMode.Loose on the canvas lets any of them act as source OR target.
+const HANDLE_CLS =
+  'opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:!opacity-100'
+const vStrip = { width: 7, height: '62%', background: '#0284c7', border: '1px solid #fff', borderRadius: 4, zIndex: 10 }
+const hStrip = { height: 7, width: '62%', background: '#0284c7', border: '1px solid #fff', borderRadius: 4, zIndex: 10 }
+
+function SideHandles() {
+  return (
+    <>
+      <Handle id="left" type="source" position={Position.Left} className={HANDLE_CLS} style={vStrip} />
+      <Handle id="right" type="source" position={Position.Right} className={HANDLE_CLS} style={vStrip} />
+      <Handle id="top" type="source" position={Position.Top} className={HANDLE_CLS} style={hStrip} />
+      <Handle id="bottom" type="source" position={Position.Bottom} className={HANDLE_CLS} style={hStrip} />
+    </>
+  )
+}
 
 // Double-click to rename in place; Enter/blur commits, Escape cancels.
 function EditableTitle({
@@ -92,7 +111,7 @@ export const ActivityNode = memo(({ data, selected }: NodeProps<NodeData>) => {
   const critical = !!data.showCritical && !!data.cpm?.critical
   return (
     <div
-      className={`rounded-md border bg-white shadow-sm px-3 py-2 w-[200px] transition-colors ${
+      className={`group rounded-md border bg-white shadow-sm px-3 py-2 w-[200px] transition-colors ${
         selected
           ? 'border-sky-500 ring-2 ring-sky-300'
           : critical
@@ -100,7 +119,7 @@ export const ActivityNode = memo(({ data, selected }: NodeProps<NodeData>) => {
             : 'border-gray-300'
       }`}
     >
-      <Handle type="target" position={Position.Left} style={handleStyle} />
+      <SideHandles />
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-mono text-gray-400">{t.activityId || t.wbsCode}</span>
         <div className="flex items-center gap-1">
@@ -124,7 +143,6 @@ export const ActivityNode = memo(({ data, selected }: NodeProps<NodeData>) => {
           <div className="h-1 rounded bg-sky-500" style={{ width: `${Math.min(100, t.progress)}%` }} />
         </div>
       )}
-      <Handle type="source" position={Position.Right} style={handleStyle} />
     </div>
   )
 })
@@ -135,8 +153,8 @@ export const MilestoneNode = memo(({ data, selected }: NodeProps<NodeData>) => {
   const t = data.task
   const critical = !!data.showCritical && !!data.cpm?.critical
   return (
-    <div className="w-[200px]">
-      <Handle type="target" position={Position.Left} style={handleStyle} />
+    <div className="group w-[200px]">
+      <SideHandles />
       <div
         className={`flex items-center gap-2 rounded-md border bg-amber-50 px-3 py-2 shadow-sm transition-colors ${
           selected
@@ -160,7 +178,6 @@ export const MilestoneNode = memo(({ data, selected }: NodeProps<NodeData>) => {
           <div className="text-[11px] text-gray-500">{formatDate(t.endDate)}</div>
         </div>
       </div>
-      <Handle type="source" position={Position.Right} style={handleStyle} />
     </div>
   )
 })
@@ -171,6 +188,8 @@ export const WbsGroupNode = memo(({ data, selected }: NodeProps<NodeData>) => {
   const t = data.task
   const { toggleCollapse } = useCanvasActions()
   const collapsed = !!data.collapsed
+  // Per-level color scheme shared with the table view.
+  const theme = wbsGroupTheme(t.wbsCode || t.wbsPath || '')
 
   const chevron = (
     <button
@@ -185,7 +204,7 @@ export const WbsGroupNode = memo(({ data, selected }: NodeProps<NodeData>) => {
     </button>
   )
   const badge = (
-    <span className="rounded bg-gray-700 px-1.5 py-0.5 text-[11px] font-mono font-semibold text-white">
+    <span className={`rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold ${theme.badge}`}>
       {t.wbsCode || 'WBS'}
     </span>
   )
@@ -193,35 +212,33 @@ export const WbsGroupNode = memo(({ data, selected }: NodeProps<NodeData>) => {
   if (collapsed) {
     return (
       <div
-        className={`flex h-full w-full items-center gap-2 rounded-md border bg-white px-2 shadow-sm transition-colors ${
+        className={`group flex h-full w-full items-center gap-2 rounded-md border bg-white px-2 shadow-sm transition-colors ${theme.accent} ${
           selected ? 'border-sky-500 ring-2 ring-sky-300' : 'border-gray-300'
         }`}
       >
-        <Handle type="target" position={Position.Left} style={handleStyle} />
+        <SideHandles />
         {chevron}
         {badge}
         <EditableTitle id={t.id} value={t.name} className="truncate text-sm font-bold text-gray-800" />
         <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
           {data.childCount} item{data.childCount === 1 ? '' : 's'}
         </span>
-        <Handle type="source" position={Position.Right} style={handleStyle} />
       </div>
     )
   }
 
   return (
     <div
-      className={`h-full w-full rounded-lg border-2 border-dashed transition-colors ${
-        selected ? 'border-sky-500 bg-sky-50/40' : 'border-gray-300 bg-gray-50/60'
+      className={`group h-full w-full rounded-lg border-2 transition-colors ${theme.accent} ${
+        selected ? 'border-sky-500 bg-sky-50/40' : theme.box
       }`}
     >
-      <Handle type="target" position={Position.Left} style={{ ...handleStyle, opacity: 0.5 }} />
+      <SideHandles />
       <div className="flex items-center gap-2 px-2 py-1.5">
         {chevron}
         {badge}
         <EditableTitle id={t.id} value={t.name} className="truncate text-sm font-bold text-gray-800" />
       </div>
-      <Handle type="source" position={Position.Right} style={{ ...handleStyle, opacity: 0.5 }} />
     </div>
   )
 })
