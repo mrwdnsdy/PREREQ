@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { Plus, AlertCircle, ClipboardIcon, ArrowLeft, Settings, Eye, EyeOff, ChevronLeft, Table2, Network } from 'lucide-react'
+import { Plus, AlertCircle, ClipboardIcon, ArrowLeft, Settings, Eye, EyeOff, ChevronLeft, Table2, Network, CalendarRange } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { TaskTable } from '../components/TaskTable'
 import { ScheduleCanvas } from '../components/canvas/ScheduleCanvas'
+import TimelineCanvas from '../components/timeline/TimelineCanvas'
 import { ResourceDrawer } from '../components/drawers/ResourceDrawer'
 import { useAuth } from '../contexts/AuthContext'
 import { useTasks, Task } from '../hooks/useTasks'
@@ -33,11 +34,13 @@ const SchedulePage: React.FC = () => {
   const location = useLocation()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = searchParams.get('view') === 'canvas' ? 'canvas' : 'table'
-  const setView = (v: 'table' | 'canvas') => {
+  const rawView = searchParams.get('view')
+  const view: 'table' | 'canvas' | 'timeline' =
+    rawView === 'canvas' ? 'canvas' : rawView === 'timeline' ? 'timeline' : 'table'
+  const setView = (v: 'table' | 'canvas' | 'timeline') => {
     const next = new URLSearchParams(searchParams)
-    if (v === 'canvas') next.set('view', 'canvas')
-    else next.delete('view')
+    if (v === 'table') next.delete('view')
+    else next.set('view', v)
     setSearchParams(next, { replace: true })
   }
   const { isAuthenticated, loading: authLoading } = useAuth()
@@ -247,6 +250,14 @@ const SchedulePage: React.FC = () => {
             >
               <Network className="w-4 h-4" /> <span className="hidden sm:inline">Canvas</span>
             </button>
+            <button
+              onClick={() => setView('timeline')}
+              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-sm font-medium transition-colors ${
+                view === 'timeline' ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <CalendarRange className="w-4 h-4" /> <span className="hidden sm:inline">Timeline</span>
+            </button>
           </div>
 
           {/* Update Schedule Button - shown when there are pending changes */}
@@ -395,6 +406,18 @@ const SchedulePage: React.FC = () => {
         {view === 'canvas' ? (
           <div className="h-full w-full" data-testid="schedule-canvas">
             <ScheduleCanvas
+              tasks={tasks || []}
+              projectId={projectId || ''}
+              selectedTaskId={selectedTaskId}
+              onSelectTask={handleSelectTask}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onAddTask={handleAddTaskFromTable}
+            />
+          </div>
+        ) : view === 'timeline' ? (
+          <div className="h-full w-full" data-testid="schedule-timeline">
+            <TimelineCanvas
               tasks={tasks || []}
               projectId={projectId || ''}
               selectedTaskId={selectedTaskId}

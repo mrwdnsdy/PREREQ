@@ -101,18 +101,47 @@ export interface WbsGroupTheme {
 
 export function wbsGroupTheme(wbsPath: string): WbsGroupTheme {
   const level = getWbsLevel(wbsPath)
+  // Pastel per-level palette: soft -300 borders, light -50/60 tint, and a
+  // pastel -100/-700 chip (toned down from the earlier vivid -400/-600 scheme).
   const themes: WbsGroupTheme[] = [
-    { box: 'border-slate-400 bg-slate-50/70', accent: 'border-l-4 border-l-slate-500', badge: 'bg-slate-600 text-white' }, // 0
-    { box: 'border-blue-400 bg-blue-50/70', accent: 'border-l-4 border-l-blue-500', badge: 'bg-blue-600 text-white' }, // 1
-    { box: 'border-green-400 bg-green-50/70', accent: 'border-l-4 border-l-green-500', badge: 'bg-green-600 text-white' }, // 2
-    { box: 'border-purple-400 bg-purple-50/70', accent: 'border-l-4 border-l-purple-500', badge: 'bg-purple-600 text-white' }, // 3
-    { box: 'border-orange-400 bg-orange-50/70', accent: 'border-l-4 border-l-orange-500', badge: 'bg-orange-600 text-white' }, // 4
-    { box: 'border-pink-400 bg-pink-50/70', accent: 'border-l-4 border-l-pink-500', badge: 'bg-pink-600 text-white' }, // 5
-    { box: 'border-indigo-400 bg-indigo-50/70', accent: 'border-l-4 border-l-indigo-500', badge: 'bg-indigo-600 text-white' }, // 6
-    { box: 'border-teal-400 bg-teal-50/70', accent: 'border-l-4 border-l-teal-500', badge: 'bg-teal-600 text-white' }, // 7
-    { box: 'border-red-400 bg-red-50/70', accent: 'border-l-4 border-l-red-500', badge: 'bg-red-600 text-white' }, // 8
-    { box: 'border-amber-400 bg-amber-50/70', accent: 'border-l-4 border-l-amber-500', badge: 'bg-amber-600 text-white' }, // 9
-    { box: 'border-gray-400 bg-gray-50/70', accent: 'border-l-4 border-l-gray-500', badge: 'bg-gray-600 text-white' }, // 10
+    { box: 'border-slate-300 bg-slate-50/60', accent: 'border-l-4 border-l-slate-300', badge: 'bg-slate-100 text-slate-700' }, // 0
+    { box: 'border-blue-300 bg-blue-50/60', accent: 'border-l-4 border-l-blue-300', badge: 'bg-blue-100 text-blue-700' }, // 1
+    { box: 'border-green-300 bg-green-50/60', accent: 'border-l-4 border-l-green-300', badge: 'bg-green-100 text-green-700' }, // 2
+    { box: 'border-purple-300 bg-purple-50/60', accent: 'border-l-4 border-l-purple-300', badge: 'bg-purple-100 text-purple-700' }, // 3
+    { box: 'border-orange-300 bg-orange-50/60', accent: 'border-l-4 border-l-orange-300', badge: 'bg-orange-100 text-orange-700' }, // 4
+    { box: 'border-pink-300 bg-pink-50/60', accent: 'border-l-4 border-l-pink-300', badge: 'bg-pink-100 text-pink-700' }, // 5
+    { box: 'border-indigo-300 bg-indigo-50/60', accent: 'border-l-4 border-l-indigo-300', badge: 'bg-indigo-100 text-indigo-700' }, // 6
+    { box: 'border-teal-300 bg-teal-50/60', accent: 'border-l-4 border-l-teal-300', badge: 'bg-teal-100 text-teal-700' }, // 7
+    { box: 'border-red-300 bg-red-50/60', accent: 'border-l-4 border-l-red-300', badge: 'bg-red-100 text-red-700' }, // 8
+    { box: 'border-amber-300 bg-amber-50/60', accent: 'border-l-4 border-l-amber-300', badge: 'bg-amber-100 text-amber-700' }, // 9
+    { box: 'border-gray-300 bg-gray-50/60', accent: 'border-l-4 border-l-gray-300', badge: 'bg-gray-100 text-gray-700' }, // 10
+  ]
+  return themes[Math.min(level, themes.length - 1)]
+}
+
+// Pastel fill for a timeline (Gantt) bar, per WBS level. `fill` = light tint
+// background, `border` = soft border, `text` = readable label color. Full
+// literal class strings so Tailwind's JIT keeps them.
+export interface WbsBarTheme {
+  fill: string
+  border: string
+  text: string
+}
+
+export function wbsBar(wbsPath: string): WbsBarTheme {
+  const level = getWbsLevel(wbsPath)
+  const themes: WbsBarTheme[] = [
+    { fill: 'bg-slate-200', border: 'border-slate-400', text: 'text-slate-800' }, // 0
+    { fill: 'bg-blue-200', border: 'border-blue-400', text: 'text-blue-900' }, // 1
+    { fill: 'bg-green-200', border: 'border-green-400', text: 'text-green-900' }, // 2
+    { fill: 'bg-purple-200', border: 'border-purple-400', text: 'text-purple-900' }, // 3
+    { fill: 'bg-orange-200', border: 'border-orange-400', text: 'text-orange-900' }, // 4
+    { fill: 'bg-pink-200', border: 'border-pink-400', text: 'text-pink-900' }, // 5
+    { fill: 'bg-indigo-200', border: 'border-indigo-400', text: 'text-indigo-900' }, // 6
+    { fill: 'bg-teal-200', border: 'border-teal-400', text: 'text-teal-900' }, // 7
+    { fill: 'bg-red-200', border: 'border-red-400', text: 'text-red-900' }, // 8
+    { fill: 'bg-amber-200', border: 'border-amber-400', text: 'text-amber-900' }, // 9
+    { fill: 'bg-gray-200', border: 'border-gray-400', text: 'text-gray-900' }, // 10
   ]
   return themes[Math.min(level, themes.length - 1)]
 }

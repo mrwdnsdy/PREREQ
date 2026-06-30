@@ -27,6 +27,7 @@ import {
   Activity,
   CalendarClock,
   CornerDownRight,
+  RotateCcw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Task } from '../../hooks/useTasks'
@@ -151,6 +152,18 @@ function CanvasInner({
     persistCollapsed(next)
   }, [persistCollapsed])
 
+  // Clear all manual leaf-drag positions and refit — recovers from messy drags.
+  const resetLayout = useCallback(() => {
+    try {
+      localStorage.removeItem(posKey(projectId))
+    } catch {
+      /* ignore */
+    }
+    setPositions({})
+    setTimeout(() => rf.fitView({ padding: 0.15, duration: 300 }), 60)
+    toast.success('Layout reset')
+  }, [projectId, rf])
+
   const rename = useCallback(
     (id: string, name: string) => onUpdateTask(id, { name }),
     [onUpdateTask],
@@ -253,8 +266,10 @@ function CanvasInner({
   // Persist a manual drag, and re-parent into a WBS group when dropped inside one.
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      persistPosition(node.id, node.position.x, node.position.y)
+      // Group boxes are always auto-positioned (see flowTransform.emit), so a
+      // saved group position is ignored — don't bother persisting it.
       if (node.type === 'wbsGroup') return
+      persistPosition(node.id, node.position.x, node.position.y)
       const overGroup = rf
         .getIntersectingNodes(node)
         .filter((n) => n.type === 'wbsGroup' && n.id !== node.id)
@@ -377,6 +392,13 @@ function CanvasInner({
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             >
               <ChevronsUpDown className="h-4 w-4" /> <span className="hidden sm:inline">Expand</span>
+            </button>
+            <button
+              onClick={resetLayout}
+              title="Reset manual layout (clear dragged positions)"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Reset</span>
             </button>
           </>
         )}

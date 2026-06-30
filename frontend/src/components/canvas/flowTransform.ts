@@ -210,7 +210,10 @@ function emit(
   out: Node[],
   opts: BuildOptions,
 ): void {
-  const pos = saved[box.task.id] ?? { x: box.x, y: box.y }
+  // Group boxes ALWAYS use the computed layout position so phases (and nested
+  // sub-groups) reflow on expand/collapse and can never overlap. Only leaf
+  // nodes honor a saved manual-drag position (relative to their parent group).
+  const pos = box.kind === 'group' ? { x: box.x, y: box.y } : (saved[box.task.id] ?? { x: box.x, y: box.y })
   const cpm = opts.cpm?.get(box.task.id)
   const base: Node = {
     id: box.task.id,
