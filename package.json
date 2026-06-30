@@ -21,5 +21,8 @@
   ],
   "dependencies": {
     "react-hot-toast": "^2.5.2"
+  },
+  "overrides": {
+    "@types/d3-dispatch": "3.0.6"
   }
 }

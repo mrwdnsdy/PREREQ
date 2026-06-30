@@ -1,0 +1,526 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import ReactFlow, {
+  Background,
+  Controls,
+  MiniMap,
+  Panel,
+  ReactFlowProvider,
+  useReactFlow,
+  useNodesState,
+  useEdgesState,
+  ConnectionLineType,
+  type Connection,
+  type Edge,
+  type Node,
+} from 'reactflow'
+import 'reactflow/dist/style.css'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  Plus,
+  Flag,
+  FolderPlus,
+  Trash2,
+  X,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Activity,
+  CalendarClock,
+  CornerDownRight,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+import { Task } from '../../hooks/useTasks'
+import { useDependencies } from '../../hooks/useDependencies'
+import { DependencyType, TaskDependency } from '../../services/dependenciesApi'
+import { buildFlow, SavedPositions, EDGE_COLORS } from './flowTransform'
+import { computeCpm, scheduleDates } from './cpm'
+import { nodeTypes } from './nodes'
+import { CanvasActionsContext } from './canvasContext'
+
+interface NodeMenu {
+  x: number
+  y: number
+  id: string
+  parentId: string | null
+  isMilestone: boolean
+}
+
+export interface ScheduleCanvasProps {
+  tasks: Task[]
+  projectId: string
+  selectedTaskId: string | null
+  onSelectTask: (id: string | null) => void
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => void
+  onDeleteTask: (taskId: string) => void
+  onAddTask: (task: Partial<Task>) => Promise<void> | void
+}
+
+const posKey = (projectId: string) => `prereq:canvas-pos:${projectId}`
+const collapseKey = (projectId: string) => `prereq:canvas-collapsed:${projectId}`
+
+function loadPositions(projectId: string): SavedPositions {
+  try {
+    return JSON.parse(localStorage.getItem(posKey(projectId)) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+function loadCollapsed(projectId: string): Set<string> {
+  try {
+    return new Set<string>(JSON.parse(localStorage.getItem(collapseKey(projectId)) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
+function CanvasInner({
+  tasks,
+  projectId,
+  selectedTaskId,
+  onSelectTask,
+  onUpdateTask,
+  onDeleteTask,
+  onAddTask,
+}: ScheduleCanvasProps) {
+  const queryClient = useQueryClient()
+  const rf = useReactFlow()
+  const { allDependencies, createDependency, updateDependency, deleteDependency } =
+    useDependencies(projectId)
+  const [positions, setPositions] = useState<SavedPositions>(() => loadPositions(projectId))
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(projectId))
+  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null)
+  const [showCritical, setShowCritical] = useState(true)
+  const [menu, setMenu] = useState<NodeMenu | null>(null)
+
+  const deps = useMemo(() => allDependencies || [], [allDependencies])
+
+  // Critical Path Method over the current activities + dependencies.
+  const cpm = useMemo(() => computeCpm(tasks, deps), [tasks, deps])
+
+  const flow = useMemo(
+    () =>
+      buildFlow(tasks, deps, positions, selectedTaskId, collapsed, {
+        cpm: cpm.nodes,
+        criticalEdges: cpm.criticalEdges,
+        showCritical,
+      }),
+    [tasks, deps, positions, selectedTaskId, collapsed, cpm, showCritical],
+  )
+
+  // Task ids that are WBS groups (have children) — for collapse/expand all.
+  const groupIds = useMemo(() => {
+    const parents = new Set<string>()
+    tasks.forEach((t) => t.parentId && parents.add(t.parentId))
+    return [...parents]
+  }, [tasks])
+
+  const persistCollapsed = useCallback(
+    (next: Set<string>) => {
+      try {
+        localStorage.setItem(collapseKey(projectId), JSON.stringify([...next]))
+      } catch {
+        /* ignore quota errors */
+      }
+    },
+    [projectId],
+  )
+
+  const toggleCollapse = useCallback(
+    (id: string) => {
+      setCollapsed((prev) => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        persistCollapsed(next)
+        return next
+      })
+    },
+    [persistCollapsed],
+  )
+
+  const collapseAll = useCallback(() => {
+    const next = new Set(groupIds)
+    setCollapsed(next)
+    persistCollapsed(next)
+  }, [groupIds, persistCollapsed])
+
+  const expandAll = useCallback(() => {
+    const next = new Set<string>()
+    setCollapsed(next)
+    persistCollapsed(next)
+  }, [persistCollapsed])
+
+  const rename = useCallback(
+    (id: string, name: string) => onUpdateTask(id, { name }),
+    [onUpdateTask],
+  )
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(flow.nodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(flow.edges)
+
+  // Re-sync the canvas whenever the underlying data (tasks/deps/selection) changes.
+  useEffect(() => {
+    setNodes(flow.nodes)
+    setEdges(flow.edges)
+  }, [flow, setNodes, setEdges])
+
+  // Keep the table's predecessor/successor columns live: tasks embed dependencies,
+  // and the dependencies hook does not invalidate the tasks query, so do it here
+  // whenever the dependency set changes.
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+  }, [deps.length, projectId, queryClient])
+
+  // Auto-fit the view when groups collapse/expand (layout changes shape).
+  useEffect(() => {
+    const h = setTimeout(() => rf.fitView({ padding: 0.15, duration: 300 }), 90)
+    return () => clearTimeout(h)
+  }, [collapsed, rf])
+
+  const persistPosition = useCallback(
+    (id: string, x: number, y: number) => {
+      setPositions((prev) => {
+        const next = { ...prev, [id]: { x, y } }
+        try {
+          localStorage.setItem(posKey(projectId), JSON.stringify(next))
+        } catch {
+          /* ignore quota errors */
+        }
+        return next
+      })
+    },
+    [projectId],
+  )
+
+  // Draw a dependency: default Finish-to-Start, no lag.
+  const onConnect = useCallback(
+    (c: Connection) => {
+      if (!c.source || !c.target || c.source === c.target) return
+      createDependency({
+        predecessorId: c.source,
+        successorId: c.target,
+        type: DependencyType.FS,
+        lag: 0,
+      })
+    },
+    [createDependency],
+  )
+
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setSelectedEdge(null)
+      onSelectTask(node.id)
+    },
+    [onSelectTask],
+  )
+
+  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+    setSelectedEdge(edge)
+  }, [])
+
+  const onPaneClick = useCallback(() => {
+    setSelectedEdge(null)
+    setMenu(null)
+    onSelectTask(null)
+  }, [onSelectTask])
+
+  const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
+    e.preventDefault()
+    const t = node.data?.task as Task | undefined
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      id: node.id,
+      parentId: (node.parentNode as string) || null,
+      isMilestone: !!t?.isMilestone,
+    })
+  }, [])
+
+  // Auto-schedule: roll early-start dates out of the dependency network.
+  const autoSchedule = useCallback(() => {
+    const updates = scheduleDates(tasks, cpm)
+    if (!updates.length) {
+      toast('Schedule already matches the dependencies.', { icon: '✅' })
+      return
+    }
+    if (!window.confirm(`Reschedule ${updates.length} activit${updates.length === 1 ? 'y' : 'ies'} from their dependencies?`))
+      return
+    updates.forEach((u) => onUpdateTask(u.id, { startDate: u.startDate, endDate: u.endDate }))
+    toast.success(`Rescheduled ${updates.length} activit${updates.length === 1 ? 'y' : 'ies'}`)
+  }, [tasks, cpm, onUpdateTask])
+
+  // Persist a manual drag, and re-parent into a WBS group when dropped inside one.
+  const onNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      persistPosition(node.id, node.position.x, node.position.y)
+      if (node.type === 'wbsGroup') return
+      const overGroup = rf
+        .getIntersectingNodes(node)
+        .filter((n) => n.type === 'wbsGroup' && n.id !== node.id)
+        .sort((a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0))
+        .pop()
+      const newParent = overGroup ? overGroup.id : null
+      if ((node.parentNode || null) !== newParent && newParent) {
+        onUpdateTask(node.id, { parentId: newParent })
+      }
+    },
+    [persistPosition, rf, onUpdateTask],
+  )
+
+  const onNodesDelete = useCallback(
+    (deleted: Node[]) => deleted.forEach((n) => onDeleteTask(n.id)),
+    [onDeleteTask],
+  )
+
+  const onEdgesDelete = useCallback(
+    (deleted: Edge[]) => deleted.forEach((e) => deleteDependency(e.id)),
+    [deleteDependency],
+  )
+
+  // Where new nodes land: inside the selected group (or the selected node's group).
+  const targetGroupId = useMemo(() => {
+    const sel = tasks.find((t) => t.id === selectedTaskId)
+    if (!sel) return null
+    const selIsGroup = tasks.some((t) => t.parentId === sel.id)
+    return selIsGroup ? sel.id : sel.parentId ?? null
+  }, [tasks, selectedTaskId])
+
+  const addPhase = () =>
+    onAddTask({ title: 'New Phase', isHeader: true, parentId: targetGroupId || undefined })
+  const addActivity = () => {
+    if (!targetGroupId) {
+      toast('Select a WBS group first, or add a phase.', { icon: 'ℹ️' })
+      return
+    }
+    onAddTask({ title: 'New Activity', parentId: targetGroupId })
+  }
+  const addMilestone = () => {
+    if (!targetGroupId) {
+      toast('Select a WBS group first, or add a phase.', { icon: 'ℹ️' })
+      return
+    }
+    onAddTask({ title: 'New Milestone', isMilestone: true, parentId: targetGroupId })
+  }
+
+  const dep = selectedEdge?.data?.dependency as TaskDependency | undefined
+
+  return (
+    <CanvasActionsContext.Provider value={{ collapsed, toggleCollapse, rename }}>
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onNodeClick={onNodeClick}
+      onNodeContextMenu={onNodeContextMenu}
+      onEdgeClick={onEdgeClick}
+      onPaneClick={onPaneClick}
+      onMoveStart={() => setMenu(null)}
+      onNodeDragStop={onNodeDragStop}
+      onNodesDelete={onNodesDelete}
+      onEdgesDelete={onEdgesDelete}
+      nodeTypes={nodeTypes}
+      connectionLineType={ConnectionLineType.SmoothStep}
+      defaultEdgeOptions={{ type: 'smoothstep' }}
+      minZoom={0.15}
+      fitView
+      proOptions={{ hideAttribution: true }}
+      className="bg-gray-50"
+    >
+      <Background gap={20} color="#e5e7eb" />
+      <Controls />
+      <MiniMap
+        className="hidden sm:block"
+        zoomable
+        pannable
+        nodeColor={(n) =>
+          n.type === 'wbsGroup' ? '#e2e8f0' : n.type === 'milestone' ? '#f59e0b' : '#0284c7'
+        }
+      />
+
+      {/* Toolbar — wraps and condenses to icons on small screens */}
+      <Panel position="top-left" className="flex flex-wrap gap-1.5 max-w-[calc(100vw-5rem)]">
+        <button
+          onClick={addPhase}
+          className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+        >
+          <FolderPlus className="h-4 w-4" /> <span className="hidden sm:inline">Phase</span>
+        </button>
+        <button
+          onClick={addActivity}
+          className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+        >
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Activity</span>
+        </button>
+        <button
+          onClick={addMilestone}
+          className="inline-flex items-center gap-1 rounded-md border border-amber-400 bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-700 shadow-sm hover:bg-amber-100"
+        >
+          <Flag className="h-4 w-4" /> <span className="hidden sm:inline">Milestone</span>
+        </button>
+        {groupIds.length > 0 && (
+          <>
+            <span className="mx-0.5 w-px self-stretch bg-gray-200" />
+            <button
+              onClick={collapseAll}
+              title="Collapse all WBS groups"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              <ChevronsDownUp className="h-4 w-4" /> <span className="hidden sm:inline">Collapse</span>
+            </button>
+            <button
+              onClick={expandAll}
+              title="Expand all WBS groups"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              <ChevronsUpDown className="h-4 w-4" /> <span className="hidden sm:inline">Expand</span>
+            </button>
+          </>
+        )}
+        <span className="mx-0.5 w-px self-stretch bg-gray-200" />
+        <button
+          onClick={() => setShowCritical((v) => !v)}
+          title="Highlight the critical path"
+          className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-sm font-medium shadow-sm transition-colors ${
+            showCritical
+              ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Activity className="h-4 w-4" /> <span className="hidden sm:inline">Critical path</span>
+        </button>
+        <button
+          onClick={autoSchedule}
+          title="Set dates from the dependency network (early start)"
+          className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+        >
+          <CalendarClock className="h-4 w-4" /> <span className="hidden sm:inline">Auto-schedule</span>
+        </button>
+      </Panel>
+
+      {/* Edge inspector */}
+      {selectedEdge && dep && (
+        <Panel position="top-right" className="w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-800">Dependency</span>
+            <button onClick={() => setSelectedEdge(null)} className="text-gray-400 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mb-1 truncate text-[11px] text-gray-500">
+            {dep.predecessor?.title} → {dep.successor?.title}
+          </div>
+          <label className="mt-2 block text-[11px] font-medium text-gray-500">Type</label>
+          <select
+            value={dep.type}
+            onChange={(e) => updateDependency(dep.id, { type: e.target.value as DependencyType })}
+            className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+          >
+            {Object.values(DependencyType).map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <label className="mt-2 block text-[11px] font-medium text-gray-500">Lag (days)</label>
+          <input
+            type="number"
+            defaultValue={dep.lag}
+            onBlur={(e) => {
+              const lag = parseInt(e.target.value, 10)
+              if (!Number.isNaN(lag) && lag !== dep.lag) updateDependency(dep.id, { lag })
+            }}
+            className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+          />
+          <button
+            onClick={() => {
+              deleteDependency(dep.id)
+              setSelectedEdge(null)
+            }}
+            className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-sm font-medium text-red-600 hover:bg-red-100"
+          >
+            <Trash2 className="h-4 w-4" /> Remove link
+          </button>
+        </Panel>
+      )}
+
+      {/* Legend */}
+      <Panel position="bottom-center" className="flex gap-3 rounded-md border border-gray-200 bg-white/90 px-3 py-1 text-[11px]">
+        {Object.entries(EDGE_COLORS).map(([k, c]) => (
+          <span key={k} className="flex items-center gap-1">
+            <span className="inline-block h-2 w-4 rounded" style={{ background: c }} />
+            {k}
+          </span>
+        ))}
+      </Panel>
+
+      {tasks.length === 0 && (
+        <Panel position="top-center" className="rounded-md bg-white/90 px-4 py-2 text-sm text-gray-500 shadow">
+          No tasks yet — add a Phase to start building the schedule.
+        </Panel>
+      )}
+    </ReactFlow>
+
+      {menu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenu(null)} />
+          <div
+            className="fixed z-50 w-52 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
+            style={{ left: menu.x, top: menu.y }}
+          >
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-100"
+              onClick={() => {
+                onAddTask({ title: 'New Activity', parentId: menu.parentId || undefined })
+                setMenu(null)
+              }}
+            >
+              <Plus className="h-4 w-4 text-gray-500" /> Add activity here
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-100"
+              onClick={() => {
+                onAddTask({ title: 'New Activity', parentId: menu.id })
+                setMenu(null)
+              }}
+            >
+              <CornerDownRight className="h-4 w-4 text-gray-500" /> Add child activity
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-100"
+              onClick={() => {
+                onUpdateTask(menu.id, { isMilestone: !menu.isMilestone })
+                setMenu(null)
+              }}
+            >
+              <Flag className="h-4 w-4 text-gray-500" />
+              {menu.isMilestone ? 'Convert to activity' : 'Convert to milestone'}
+            </button>
+            <div className="my-1 border-t border-gray-100" />
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-600 hover:bg-red-50"
+              onClick={() => {
+                onDeleteTask(menu.id)
+                if (selectedTaskId === menu.id) onSelectTask(null)
+                setMenu(null)
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </button>
+          </div>
+        </>
+      )}
+    </CanvasActionsContext.Provider>
+  )
+}
+
+export function ScheduleCanvas(props: ScheduleCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <CanvasInner {...props} />
+    </ReactFlowProvider>
+  )
+}
+
+export default ScheduleCanvas

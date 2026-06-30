@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Plus, AlertCircle, ClipboardIcon, ArrowLeft, Settings, Eye, EyeOff, ChevronLeft } from 'lucide-react'
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { Plus, AlertCircle, ClipboardIcon, ArrowLeft, Settings, Eye, EyeOff, ChevronLeft, Table2, Network } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { TaskTable } from '../components/TaskTable'
+import { ScheduleCanvas } from '../components/canvas/ScheduleCanvas'
 import { ResourceDrawer } from '../components/drawers/ResourceDrawer'
 import { useAuth } from '../contexts/AuthContext'
 import { useTasks, Task } from '../hooks/useTasks'
@@ -31,6 +32,14 @@ const SchedulePage: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('view') === 'canvas' ? 'canvas' : 'table'
+  const setView = (v: 'table' | 'canvas') => {
+    const next = new URLSearchParams(searchParams)
+    if (v === 'canvas') next.set('view', 'canvas')
+    else next.delete('view')
+    setSearchParams(next, { replace: true })
+  }
   const { isAuthenticated, loading: authLoading } = useAuth()
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [showWbs, setShowWbs] = useState(true)
@@ -214,14 +223,32 @@ const SchedulePage: React.FC = () => {
             className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-sky-500"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Project
+            <span className="hidden sm:inline">Back to Project</span>
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">
-            Project Schedule
-          </h1>
+          <h1 className="text-lg font-semibold text-gray-900 hidden md:block">Project Schedule</h1>
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Table / Canvas view toggle */}
+          <div className="inline-flex rounded-md border border-gray-300 bg-white p-0.5">
+            <button
+              onClick={() => setView('table')}
+              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-sm font-medium transition-colors ${
+                view === 'table' ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Table2 className="w-4 h-4" /> <span className="hidden sm:inline">Table</span>
+            </button>
+            <button
+              onClick={() => setView('canvas')}
+              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-sm font-medium transition-colors ${
+                view === 'canvas' ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Network className="w-4 h-4" /> <span className="hidden sm:inline">Canvas</span>
+            </button>
+          </div>
+
           {/* Update Schedule Button - shown when there are pending changes */}
           {(isUpdating || isAdding || isDeleting) && (
             <button
@@ -246,7 +273,7 @@ const SchedulePage: React.FC = () => {
               className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-sky-500"
             >
               <Settings className="w-4 h-4" />
-              Columns
+              <span className="hidden sm:inline">Columns</span>
             </button>
             
             {showColumnMenu && (
@@ -365,7 +392,19 @@ const SchedulePage: React.FC = () => {
 
       {/* Content */}
       <section className="flex-1 overflow-hidden">
-        {!tasks || tasks.length === 0 ? (
+        {view === 'canvas' ? (
+          <div className="h-full w-full" data-testid="schedule-canvas">
+            <ScheduleCanvas
+              tasks={tasks || []}
+              projectId={projectId || ''}
+              selectedTaskId={selectedTaskId}
+              onSelectTask={handleSelectTask}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onAddTask={handleAddTaskFromTable}
+            />
+          </div>
+        ) : !tasks || tasks.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <ClipboardIcon className="h-10 w-10 text-gray-300 mx-auto mb-4" />

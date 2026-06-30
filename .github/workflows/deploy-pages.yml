@@ -1,0 +1,69 @@
+name: Deploy frontend to GitHub Pages
+
+# Publishes the built SPA to GitHub Pages on merge to main (or manual run).
+# The frontend talks to whatever backend URL is configured in the repo variable
+# VITE_API_URL (Settings → Secrets and variables → Actions → Variables). If it
+# is unset the build falls back to http://localhost:3000, so the page loads but
+# API calls only work once a real backend URL is set. The backend's CORS must
+# allow the Pages origin (https://<owner>.github.io).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress production deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          # Project Pages serves at /<repo>/ — must match the repository name.
+          VITE_BASE: /PREREQ/
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: npm run build
+      - name: SPA fallback (client-side routing on Pages)
+        run: cp frontend/dist/index.html frontend/dist/404.html
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

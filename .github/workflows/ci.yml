@@ -1,0 +1,111 @@
+name: CI
+
+# Automated verification gate for the CI-triage loop.
+# This workflow is the red/green oracle the loop reads (see .claude/LOOP.md).
+# It runs on every push to main and on every pull request, so any code update
+# is verified without a human in the room.
+#
+# Installs are deterministic: a single root package-lock.json is committed, so
+# every job uses `npm ci`. legacy-peer-deps is set in the root .npmrc to resolve
+# the @nestjs/serve-static peer conflict (app is on NestJS 10).
+#
+# Blocking signal = build + test. Lint is non-blocking (continue-on-error)
+# because the repo has no ESLint config yet (no .eslintrc*/eslint.config.*);
+# adding one is tracked as an escalation in .claude/ci-triage-state.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# @playwright/test is a frontend devDependency (visual-test harness). Skip its
+# browser download during `npm ci` — CI only builds/tests, it doesn't run the
+# harness (which uses the pre-installed browser in the dev environment).
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+jobs:
+  backend:
+    name: backend (build · test)
+    runs-on: ubuntu-latest
+    strategy:
+      # Surface every job's failure, not just the first — the triage loop
+      # classifies the full set of failures in one pass.
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies (deterministic, all workspaces)
+        run: npm ci
+      - name: Generate Prisma client
+        # Required: backend specs import generated types (e.g. DependencyType).
+        # NOT `prisma migrate deploy` — there is no prisma/migrations/ dir.
+        working-directory: backend
+        run: npm run prisma:generate
+      - name: Lint (non-blocking — no ESLint config yet)
+        continue-on-error: true
+        working-directory: backend
+        run: npm run lint
+      - name: Build
+        working-directory: backend
+        run: npm run build
+      - name: Test
+        working-directory: backend
+        run: npm test -- --passWithNoTests
+
+      # --- Future integration tests against a real database -------------------
+      # Current backend specs mock PrismaService, so no DB is needed yet. When
+      # integration tests are added, enable a Postgres service and use
+      # `npx prisma db push` (NOT `migrate deploy` — no migrations dir).
+
+  frontend:
+    name: frontend (build)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies (deterministic, all workspaces)
+        run: npm ci
+      - name: Lint (non-blocking — no ESLint config yet)
+        continue-on-error: true
+        working-directory: frontend
+        run: npm run lint
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  infrastructure:
+    name: infrastructure (build)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies (deterministic, all workspaces)
+        run: npm ci
+      - name: Build
+        working-directory: infrastructure
+        run: npm run build
+      - name: Test
+        # No CDK tests exist yet; keep green until they are added.
+        working-directory: infrastructure
+        run: npm test -- --passWithNoTests
