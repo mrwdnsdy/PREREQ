@@ -30,10 +30,18 @@ entry) instead. `settings.json` marks these `ask`, so any edit prompts a human.
 | `env` / `infra` | **Escalate** — comment + state entry, no code change |
 | anything touching a protected path | **Escalate** — never edit autonomously |
 
-## Hard nevers (enforced as `deny` in settings.json)
+## Merge / push-to-main policy
 
-- Never merge a PR or enable auto-merge.
-- Never push to `main`; never force-push (`git push --force` / `-f`).
+- The **autonomous loop never auto-merges** and never pushes to `main` on its own
+  — it always stops at a **draft PR** and leaves merging to a human.
+- Merging or pushing to `main` happens **only on an explicit user request**. The
+  earlier blanket `deny` on these was removed from `settings.json` at the user's
+  direction so that a requested merge can go through; the loop's autonomous
+  behaviour above is unchanged.
+
+## Hard nevers (still enforced as `deny` in settings.json)
+
+- Never force-push (`git push --force` / `-f`).
 - Never disable or delete a failing test to go green — file an escalation instead.
 - Never commit secrets or real `DATABASE_URL` values.
 
