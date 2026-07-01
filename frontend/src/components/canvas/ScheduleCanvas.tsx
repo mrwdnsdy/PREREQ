@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -90,6 +90,9 @@ function CanvasInner({
     useDependencies(projectId)
   const [positions, setPositions] = useState<SavedPositions>(() => loadPositions(projectId))
   const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed(projectId))
+  // On first visit (no saved collapse state) default to collapsed deliverable
+  // cards instead of exploding every nested activity — the main declutter.
+  const didDefaultCollapse = useRef<boolean>(!!localStorage.getItem(collapseKey(projectId)))
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null)
   const [showCritical, setShowCritical] = useState(true)
   const [menu, setMenu] = useState<NodeMenu | null>(null)
@@ -115,6 +118,12 @@ function CanvasInner({
     tasks.forEach((t) => t.parentId && parents.add(t.parentId))
     return [...parents]
   }, [tasks])
+
+  useEffect(() => {
+    if (didDefaultCollapse.current || !groupIds.length) return
+    setCollapsed(new Set(groupIds))
+    didDefaultCollapse.current = true
+  }, [groupIds])
 
   const persistCollapsed = useCallback(
     (next: Set<string>) => {

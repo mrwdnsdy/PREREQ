@@ -215,13 +215,14 @@ export const WbsGroupNode = memo(({ data, selected }: NodeProps<NodeData>) => {
         className={`group flex h-full w-full items-center gap-2 rounded-md border bg-white px-2 shadow-sm transition-colors ${theme.accent} ${
           selected ? 'border-sky-500 ring-2 ring-sky-300' : 'border-gray-300'
         }`}
+        title={`${formatDate(t.startDate)} → ${formatDate(t.endDate)}`}
       >
         <SideHandles />
         {chevron}
         {badge}
         <EditableTitle id={t.id} value={t.name} className="truncate text-sm font-bold text-gray-800" />
-        <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
-          {data.childCount} item{data.childCount === 1 ? '' : 's'}
+        <span className="ml-auto whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
+          {data.childCount} activit{data.childCount === 1 ? 'y' : 'ies'} · {t.duration}d
         </span>
       </div>
     )
