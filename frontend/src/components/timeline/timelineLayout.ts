@@ -146,4 +146,75 @@ export function packLanes(items: { left: number; width: number }[], gap: number)
   return lane
 }
 
+// Orthogonal "elbow" connector between two anchor points: exit horizontally,
+// turn at the horizontal midpoint, run vertically, then into the target. Reads
+// far cleaner than long beziers for schedule dependency links.
+export function orthogonalPath(ax: number, ay: number, bx: number, by: number): string {
+  if (Math.abs(ay - by) < 1) return `M ${ax} ${ay} L ${bx} ${by}` // same row → straight
+  const midX = bx >= ax ? Math.max(ax + 12, (ax + bx) / 2) : Math.min(ax - 12, (ax + bx) / 2)
+  return `M ${ax} ${ay} L ${midX} ${ay} L ${midX} ${by} L ${bx} ${by}`
+}
+
+// Date span (min descendant start / max descendant end) for a group — the banner
+// extent in the TSLD view. Falls back to the task's own dates.
+export function bandFor(id: string, tasks: Task[], childMap: Map<string, Task[]>): { startMs: number; endMs: number } | null {
+  const byId = new Map(tasks.map((t) => [t.id, t]))
+  let min = Infinity
+  let max = -Infinity
+  const walk = (tid: string) => {
+    const kids = childMap.get(tid)
+    if (!kids || kids.length === 0) {
+      const t = byId.get(tid)
+      if (!t) return
+      const s = parseDate(t.startDate)
+      const e = parseDate(t.endDate)
+      if (s) min = Math.min(min, s.getTime())
+      if (e) max = Math.max(max, e.getTime())
+      return
+    }
+    kids.forEach((k) => walk(k.id))
+  }
+  walk(id)
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    const t = byId.get(id)
+    const s = t ? parseDate(t.startDate) : null
+    const e = t ? parseDate(t.endDate) : null
+    if (!s || !e) return null
+    return { startMs: s.getTime(), endMs: e.getTime() }
+  }
+  return { startMs: min, endMs: max }
+}
+
+// Longest-path depth (layer index) per task over the dependency DAG, restricted to
+// the given visible ids. Used to place Network cards left→right so most edges point
+// forward and crossings are minimized. Ids with no predecessor start at layer 0.
+export function layerByDepth(
+  visibleIds: string[],
+  edges: { predecessorId: string; successorId: string }[],
+): Map<string, number> {
+  const set = new Set(visibleIds)
+  const preds = new Map<string, string[]>()
+  visibleIds.forEach((id) => preds.set(id, []))
+  for (const e of edges) {
+    if (set.has(e.predecessorId) && set.has(e.successorId)) {
+      preds.get(e.successorId)!.push(e.predecessorId)
+    }
+  }
+  const depth = new Map<string, number>()
+  const visiting = new Set<string>()
+  const calc = (id: string): number => {
+    const cached = depth.get(id)
+    if (cached !== undefined) return cached
+    if (visiting.has(id)) return 0 // cycle guard
+    visiting.add(id)
+    const ps = preds.get(id) || []
+    const d = ps.length ? Math.max(...ps.map((p) => calc(p) + 1)) : 0
+    visiting.delete(id)
+    depth.set(id, d)
+    return d
+  }
+  visibleIds.forEach(calc)
+  return depth
+}
+
 export { childMapOf }
