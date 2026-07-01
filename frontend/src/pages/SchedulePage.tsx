@@ -164,6 +164,11 @@ const SchedulePage: React.FC = () => {
     setIsResourceDrawerCollapsed(!isResourceDrawerCollapsed)
   }
 
+  // Width the fixed right drawer occupies, so the header + content reserve that
+  // space and shrink beside it instead of being overlapped. 0 when closed
+  // (full width), 48px collapsed, 320px (w-80) expanded — matches ResourceDrawer.
+  const drawerW = isResourceDrawerOpen ? (isResourceDrawerCollapsed ? 48 : 320) : 0
+
   if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -219,7 +224,10 @@ const SchedulePage: React.FC = () => {
   return (
     <main className="h-screen flex flex-col relative">
       {/* Header */}
-      <header className="h-12 flex items-center justify-between border-b bg-white/80 backdrop-blur px-4 relative z-10 flex-shrink-0">
+      <header
+        className="h-12 flex items-center justify-between border-b bg-white/80 backdrop-blur px-4 relative z-10 flex-shrink-0 transition-[margin] duration-300"
+        style={{ marginRight: drawerW }}
+      >
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(`/projects/${projectId}`)}
@@ -401,8 +409,11 @@ const SchedulePage: React.FC = () => {
         </div>
       </header>
 
-      {/* Content */}
-      <section className="flex-1 overflow-hidden">
+      {/* Content — reserves the drawer's width so it never overlaps the canvas */}
+      <section
+        className="flex-1 overflow-hidden transition-[margin] duration-300"
+        style={{ marginRight: drawerW }}
+      >
         {view === 'canvas' ? (
           <div className="h-full w-full" data-testid="schedule-canvas">
             <ScheduleCanvas
@@ -449,8 +460,6 @@ const SchedulePage: React.FC = () => {
                 showWbs={showWbs}
                 onToggleWbs={setShowWbs}
               />
-              {/* Invisible spacer equal to drawer width so last columns are reachable */}
-              <div className="w-80 shrink-0" />
             </div>
           </div>
         )}
